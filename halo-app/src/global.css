@@ -1,9 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Interim dark palette sampled by eye from hero-mid-2 (forest under overcast sky).
+ * Replaced by the generated per-image themes from scripts/build-themes in the theme chunk.
+ * Channels are space-separated RGB so Tailwind's /<alpha> modifiers work.
+ */
 :root {
-  --font-display:
-    Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
-    Segoe UI Symbol, Noto Color Emoji;
-  --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
-  --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
-  --font-serif: Georgia, 'Times New Roman', serif;
+  --c-bg: 16 23 22;
+  --c-surface: 26 35 33;
+  --c-glass: 236 242 238;
+  --c-hairline: 236 242 238;
+  --c-text: 241 239 233;
+  --c-muted: 166 175 171;
+  --c-accent: 128 186 168;
+  --c-on-accent: 16 23 22;
 }
