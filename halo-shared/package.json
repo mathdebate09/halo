@@ -1,0 +1,16 @@
+{
+  "name": "halo-shared",
+  "private": true,
+  "type": "module",
+  "description": "Pure TypeScript core shared by halo-app and halo-backend (units, day key, plan maths, scoring).",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "sync": "node scripts/sync.mjs",
+    "sync:check": "node scripts/sync.mjs --check"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.11"
+  }
+}
