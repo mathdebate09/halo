@@ -6,6 +6,7 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { LaunchSequence } from '@/components/launch-sequence';
+import { ToastHost } from '@/components/toast';
 import { DataGate } from '@/db/data-gate';
 import { useOnboarded } from '@/onboarding/state';
 import { HaloThemeProvider, useHaloTheme } from '@/theme/theme-provider';
@@ -37,6 +38,15 @@ function RootNavigator() {
               contentStyle: { backgroundColor: 'transparent' },
             }}
           />
+          <Stack.Screen
+            name="weigh-in"
+            options={{
+              presentation: 'transparentModal',
+              animation: 'fade',
+              contentStyle: { backgroundColor: 'transparent' },
+            }}
+          />
+          <Stack.Screen name="advisor" />
         </Stack.Protected>
         <Stack.Protected guard={!onboarded}>
           <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
@@ -53,6 +63,7 @@ export default function RootLayout() {
       <HaloThemeProvider>
         <DataGate>
           <RootNavigator />
+          <ToastHost />
           <LaunchSequence />
         </DataGate>
       </HaloThemeProvider>

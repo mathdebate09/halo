@@ -5,6 +5,7 @@ import {
   activityScore,
   dietScore,
   expectedIntakeFraction,
+  mealTypeAt,
   nextTier,
   overallScore,
   pickHeroVariant,
@@ -175,5 +176,21 @@ describe('tiers', () => {
     for (let i = 0; i < 50; i++) expect(pickHeroVariant(2)).not.toBe(2);
     const seen = new Set(Array.from({ length: 200 }, () => pickHeroVariant()));
     expect(seen).toEqual(new Set([1, 2, 3]));
+  });
+});
+
+describe('meal type by time', () => {
+  it('maps windows (±1 h) to meals and the gaps to snacks', () => {
+    expect([6.5, 10.9, 12, 15.4, 16.5, 18.5, 22.9, 23.5, 2].map((h) => mealTypeAt(h))).toEqual([
+      'breakfast',
+      'breakfast',
+      'lunch',
+      'lunch',
+      'snack',
+      'dinner',
+      'dinner',
+      'snack',
+      'snack',
+    ]);
   });
 });

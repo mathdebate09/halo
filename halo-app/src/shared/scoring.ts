@@ -118,6 +118,18 @@ export type DietInput = {
 const WINDOW_GRACE = 1;
 
 /**
+ * The meal type a log made at `hour` most likely is: a main meal within an hour of its window,
+ * otherwise a snack. Editable wherever it is shown.
+ */
+export function mealTypeAt(hour: number, windows = DEFAULT_MEAL_WINDOWS): MealType {
+  for (const type of ['breakfast', 'lunch', 'dinner'] as const) {
+    const w = windows[type];
+    if (hour >= w.start - WINDOW_GRACE && hour <= w.end + WINDOW_GRACE) return type;
+  }
+  return 'snack';
+}
+
+/**
  * Diet against where the day should be by now: calories (40), protein (25), carbs (10) and fat
  * (10) on the expected-by-now curve, plus meal timing (15). "By now" is at least the share of the
  * meals already logged, so an early breakfast isn't scored as overeating. With nothing logged it
