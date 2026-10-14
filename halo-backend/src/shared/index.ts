@@ -3,4 +3,5 @@
 export * from './day.js';
 export * from './plan.js';
 export * from './scoring.js';
+export * from './sync.js';
 export * from './units.js';

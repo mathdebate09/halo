@@ -42,6 +42,9 @@ import { db } from '@/db/client';
 import { deleteRecord, upsertRecord } from '@/db/mutate';
 import { outbox, water } from '@/db/schema';
 import { getDevice } from '@/lib/device';
+import { API_URL } from '@/sync/api';
+import { useSyncStatus } from '@/sync/status';
+import { runSync } from '@/sync/worker';
 import { dayKey } from '@/shared';
 import { themeIds, zones } from '@/theme/themes';
 import Svg, { Path } from 'react-native-svg';
@@ -88,6 +91,29 @@ function Btn({ label, onPress }: { label: string; onPress: () => void }) {
   );
 }
 
+function SyncRow() {
+  const sync = useSyncStatus();
+  const { data: synced } = useLiveQuery(
+    db.select({ n: count() }).from(water).where(eq(water.syncState, 'synced')),
+  );
+  const ago = sync.lastSyncAt
+    ? `${Math.round((Date.now() - sync.lastSyncAt) / 1000)}s ago`
+    : 'never';
+  return (
+    <Row
+      title="Sync"
+      status={[
+        `${API_URL} · ${sync.state} · last ${ago}`,
+        `last run pushed ${sync.lastPushed}, pulled ${sync.lastPulled} · ${synced[0]?.n ?? 0} water rows synced`,
+        sync.lastError ? `error: ${sync.lastError}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n')}>
+      <Btn label="Sync now" onPress={() => void runSync()} />
+    </Row>
+  );
+}
+
 function StoreRow() {
   const today = dayKey(new Date());
   const device = getDevice();
@@ -118,7 +144,7 @@ function StoreRow() {
     <Row
       title="Local store (SQLite + outbox)"
       status={[
-        `device ${device?.id.slice(0, 8) ?? '—'}… · key ${device ? '•'.repeat(4) + device.key.slice(-4) : '—'}`,
+        `device ${device?.id.slice(0, 8) ?? '—'}… · app key ${process.env.EXPO_PUBLIC_APP_KEY ? '•'.repeat(4) + process.env.EXPO_PUBLIC_APP_KEY.slice(-4) : 'missing'}`,
         `today ${today}: ${todayWater[0]?.ml ?? 0} ml water in ${todayWater[0]?.n ?? 0} logs`,
         `outbox ${pending[0]?.n ?? 0} pending: ${ops.map((o) => `${o.op} ${o.entity}`).join(', ') || 'empty'}`,
       ].join('\n')}>
@@ -244,6 +270,7 @@ export default function DevScreen() {
 
         <ThemesRow />
         <StoreRow />
+        <SyncRow />
 
         <Row title="Fonts (embedded)" status="Serif, italic, sans and medium below">
           <Text className="font-serif text-[22px] text-text">Serif</Text>
