@@ -15,6 +15,15 @@ const envSchema = z.object({
   APP_KEY: appKeySchema,
   /** Requests per minute per device. */
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(120),
+  /** DeepSeek API key. Without it the AI endpoints answer 503 and the app keeps its fallbacks. */
+  DEEPSEEK_API_KEY: z.string().min(1).optional(),
+  DEEPSEEK_BASE_URL: z.url().default('https://api.deepseek.com'),
+  /** One model for text and images (DeepSeek vision guide). */
+  DEEPSEEK_MODEL: z.string().min(1).default('deepseek-flash'),
+  /** Per-attempt timeout for an AI call. */
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),
+  /** Jobs a device may have queued or running at once. */
+  MAX_JOBS_PER_DEVICE: z.coerce.number().int().positive().default(2),
 });
 
 export type Env = z.infer<typeof envSchema>;
