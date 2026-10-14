@@ -62,14 +62,24 @@ function read(): Stored {
 }
 
 let snapshot = read();
-const write = (next: Stored) => kv.set(KEY, JSON.stringify(next));
-
-// One listener keeps the cached snapshot in step with MMKV (useSyncExternalStore needs a stable value).
 const listeners = new Set<() => void>();
+const notify = () => listeners.forEach((l) => l());
+
+// Writes update the snapshot synchronously: MMKV's change listener isn't guaranteed to fire
+// before the next screen mounts, and that screen must see the answer just given.
+function write(next: Stored) {
+  snapshot = next;
+  kv.set(KEY, JSON.stringify(next));
+  notify();
+}
+
+// Changes made elsewhere (e.g. a reset from another module) still flow in.
 kv.addOnValueChangedListener((key) => {
   if (key !== KEY) return;
-  snapshot = read();
-  listeners.forEach((l) => l());
+  const fresh = read();
+  if (JSON.stringify(fresh) === JSON.stringify(snapshot)) return;
+  snapshot = fresh;
+  notify();
 });
 
 function subscribe(listener: () => void) {

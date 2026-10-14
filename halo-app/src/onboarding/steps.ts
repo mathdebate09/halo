@@ -11,6 +11,11 @@ export const STEPS = [
   { id: 'goal' },
   { id: 'interests' },
   { id: 'sex' },
+  { id: 'birth' },
+  { id: 'height' },
+  { id: 'weight' },
+  // A target weight is meaningless when the goal is to eat better at the same weight.
+  { id: 'goal-weight', skip: (a) => a.goal === 'maintain' || !a.goal },
 ] as const satisfies readonly { id: string; skip?: (a: Answers) => boolean }[];
 
 export type StepId = (typeof STEPS)[number]['id'];

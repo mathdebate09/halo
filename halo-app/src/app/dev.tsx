@@ -32,6 +32,7 @@ import {
 import { createMMKV } from 'react-native-mmkv';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { router } from 'expo-router';
 import { and, count, desc, eq, isNull, sum } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 
@@ -103,7 +104,13 @@ function OnboardingRow() {
           : `in progress at "${state.step}"`,
         `answers: ${JSON.stringify(state.answers)}`,
       ].join('\n')}>
-      <Btn label="Reset onboarding" onPress={resetOnboarding} />
+      <Btn
+        label="Reset onboarding"
+        onPress={() => {
+          resetOnboarding();
+          router.replace('/onboarding');
+        }}
+      />
     </Row>
   );
 }

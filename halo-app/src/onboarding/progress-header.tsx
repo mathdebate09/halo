@@ -29,7 +29,8 @@ export function ProgressHeader() {
   const reduced = useReducedMotion();
   const { answers } = useOnboarding();
   const segment = usePathname().split('/').pop() ?? '';
-  const step = isStepId(segment) ? segment : FIRST_STEP;
+  const inFlow = isStepId(segment);
+  const step = inFlow ? segment : FIRST_STEP;
   const progress = progressOf(step, answers);
 
   const [trackWidth, setTrackWidth] = useState(0);
@@ -41,6 +42,8 @@ export function ProgressHeader() {
   const fillStyle = useAnimatedStyle(() => ({ width: fill.get() }));
 
   const canGoBack = step !== FIRST_STEP;
+  // Off-flow screens (the adult gate) have no position in the flow.
+  if (!inFlow) return null;
 
   return (
     <View
