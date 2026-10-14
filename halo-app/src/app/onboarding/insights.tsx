@@ -19,9 +19,9 @@ export default function InsightsStep() {
       <View className="items-center rounded-card border border-hairline/10 bg-surface px-6 pb-7 pt-6">
         <View className="flex-row gap-3">
           {[
-            ['7.8', 'Diet'],
-            ['6.4', 'Activity'],
-            ['8.1', 'Vitals'],
+            ['78', 'Diet'],
+            ['64', 'Activity'],
+            ['81', 'Vitals'],
           ].map(([value, label]) => (
             <View key={label} className="items-center">
               <View className="h-14 w-14 items-center justify-center rounded-full border border-hairline/15 bg-glass/10">

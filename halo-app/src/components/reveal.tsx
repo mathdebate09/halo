@@ -1,18 +1,29 @@
 import type { ReactNode } from 'react';
 import type { StyleProp, ViewProps, ViewStyle } from 'react-native';
 import Animated, {
+  Easing,
   Extrapolation,
   interpolate,
   makeMutable,
   useAnimatedStyle,
   useReducedMotion,
+  withDelay,
+  withTiming,
 } from 'react-native-reanimated';
 
 /**
- * 0 → 1 as the launch overlay clears (driven by LaunchSequence). Stays at 1 afterwards, so
- * Reveal is inert on every later mount.
+ * 0 → 1 as the launch overlay clears (driven by LaunchSequence) or onboarding hands off to
+ * Today (replayReveal). Stays at 1 otherwise, so Reveal is inert on later mounts.
  */
 export const launchReveal = makeMutable(0);
+
+/** Plays the staggered rise again (e.g. as onboarding hands off to Today). */
+export function replayReveal(delayMs = 250) {
+  launchReveal.set(0);
+  launchReveal.set(
+    withDelay(delayMs, withTiming(1, { duration: 900, easing: Easing.bezier(0.23, 1, 0.32, 1) })),
+  );
+}
 
 const STAGGER = 0.09; // of the reveal progress (~80ms apart)
 const SPAN = 0.55; // each element's share of the reveal (~500ms)

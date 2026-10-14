@@ -8,6 +8,7 @@ import { DeviceThrottlerGuard } from './device/device-throttler.guard.js';
 import { DeviceGuard } from './device/device.guard.js';
 import { DeviceModule } from './device/device.module.js';
 import { HealthController } from './health/health.controller.js';
+import { LegalController } from './legal/legal.controller.js';
 import { SyncModule } from './sync/sync.module.js';
 
 @Module({})
@@ -21,7 +22,7 @@ export class AppModule {
         DeviceModule,
         SyncModule,
       ],
-      controllers: [HealthController],
+      controllers: [HealthController, LegalController],
       providers: [
         { provide: ENV, useValue: env },
         // Order matters: rate-limit first (cheap), then authenticate the device.

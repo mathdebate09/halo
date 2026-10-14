@@ -16,8 +16,11 @@ export const zones = data.zones;
 /** Calm 3-stop gradient per tier (top, mid, bottom): launch sequence and CDN fallback. */
 export const tierGradients = data.tierGradients as Record<Tier, [string, string, string]>;
 
-/** Matches the :root defaults the theme script writes into global.css. */
-export const DEFAULT_THEME_ID: ThemeId = 'mid-2';
+/**
+ * First run and onboarding: high-2, the mountain on the intro screen. Matches the :root defaults
+ * the theme script writes into global.css.
+ */
+export const DEFAULT_THEME_ID: ThemeId = 'high-2';
 
 export function isThemeId(value: unknown): value is ThemeId {
   return typeof value === 'string' && value in themes;

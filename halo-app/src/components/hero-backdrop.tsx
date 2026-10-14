@@ -1,7 +1,14 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { type ColorValue, StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { motion } from '@/theme/motion';
 import { useHaloTheme } from '@/theme/theme-provider';
@@ -16,9 +23,24 @@ const FADE_STEPS = [0, 0.25, 0.5, 0.75, 1];
  * Full-bleed hero image with the tier veil and the fade into the theme background, layered
  * exactly as scripts/build-themes.mjs verified text contrast. Crossfades on theme change.
  */
-export function HeroBackdrop() {
+const DRIFT_FROM = 1.06;
+const DRIFT_MS = 6000;
+
+/**
+ * `drift`: the image settles slowly from 1.06× to exactly 1× (the onboarding finale), so when it
+ * hands off to Today, whose hero sits at 1×, the crossfade between the two is seamless.
+ */
+export function HeroBackdrop({ drift = false }: { drift?: boolean }) {
   const { theme, target } = useHaloTheme();
   const [failedId, setFailedId] = useState<ThemeId | null>(null);
+  const reduced = useReducedMotion();
+  const scale = useSharedValue(drift && !reduced ? DRIFT_FROM : 1);
+  useEffect(() => {
+    if (drift && !reduced) {
+      scale.set(withTiming(1, { duration: DRIFT_MS, easing: Easing.bezier(0.23, 1, 0.32, 1) }));
+    }
+  }, [drift, reduced, scale]);
+  const driftStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
 
   const veilColors = theme.veil.stops.map((s) =>
     withAlpha(theme.colors.veil, s.alpha),
@@ -42,15 +64,18 @@ export function HeroBackdrop() {
       {failedId === target.id ? (
         <LinearGradient colors={tierGradients[target.tier]} style={StyleSheet.absoluteFill} />
       ) : (
-        <Image
-          source={{ uri: target.image }}
-          placeholder={{ blurhash: target.blurhash }}
-          contentFit="cover"
-          cachePolicy="disk"
-          transition={{ duration: motion.themeFade, effect: 'cross-dissolve' }}
-          onError={() => setFailedId(target.id)}
-          style={StyleSheet.absoluteFill}
-        />
+        <Animated.View style={[StyleSheet.absoluteFill, driftStyle]}>
+          <Image
+            source={{ uri: target.image }}
+            placeholder={{ blurhash: target.blurhash }}
+            contentFit="cover"
+            // Memory too: the hero must not flash its placeholder when another screen redraws it.
+            cachePolicy="memory-disk"
+            transition={{ duration: motion.themeFade, effect: 'cross-dissolve' }}
+            onError={() => setFailedId(target.id)}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
       )}
       <LinearGradient
         colors={veilColors}

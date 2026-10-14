@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 
 import { PrimaryButton, QuietButton } from '@/components/button';
 import { ExerciseIcon, MoonIcon, ScaleIcon, VitalsIcon } from '@/components/icons';
-import { connectHealthConnect, readBodyMeasurements } from '@/lib/health-connect';
+import { connectHealthConnect, readAverageSteps, readBodyMeasurements } from '@/lib/health-connect';
 import { goNext, useStepFocus } from '@/onboarding/navigation';
 import { OnboardingScreen } from '@/onboarding/onboarding-screen';
 import { setAnswers } from '@/onboarding/state';
@@ -32,8 +32,10 @@ export default function HealthStep() {
     setBusy(true);
     const status = await connectHealthConnect();
     if (status === 'connected') {
-      const body = await readBodyMeasurements();
-      setAnswers({ healthConnect: { status, ...body, at: Date.now() } });
+      const [body, averageSteps] = await Promise.all([readBodyMeasurements(), readAverageSteps()]);
+      setAnswers({
+        healthConnect: { status, ...body, averageSteps: averageSteps ?? undefined, at: Date.now() },
+      });
       setBusy(false);
       goNext('health');
       return;

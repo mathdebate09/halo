@@ -15,11 +15,15 @@ export function useStepFocus(step: StepId) {
   );
 }
 
-/** Forward: the next visible step, or finish onboarding (the root guard then shows Today). */
-export function goNext(current: StepId) {
+/**
+ * Forward: the next visible step, or finish onboarding (the root guard then shows Today).
+ * `replace` drops the current step from history (e.g. the plan-building animation).
+ */
+export function goNext(current: StepId, { replace = false } = {}) {
   const next = nextStep(current, getOnboarding().answers);
-  if (next) router.push(hrefOf(next));
-  else completeOnboarding();
+  if (!next) completeOnboarding();
+  else if (replace) router.replace(hrefOf(next));
+  else router.push(hrefOf(next));
 }
 
 /** Back: pop when there's history; after a resume there isn't, so replace with the previous step. */

@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useDockInset } from '@/components/dock';
+import { HeroBackdrop } from '@/components/hero-backdrop';
 import { Reveal } from '@/components/reveal';
 import { ThemedScreen } from '@/components/themed-screen';
 
@@ -10,9 +11,9 @@ import { ThemedScreen } from '@/components/themed-screen';
 // on device; replaced by the real Today screen later.
 
 const SCORES = [
-  { label: 'Diet', value: '7.8' },
-  { label: 'Activity', value: '6.4' },
-  { label: 'Vitals', value: '8.1' },
+  { label: 'Diet', value: '78' },
+  { label: 'Activity', value: '64' },
+  { label: 'Vitals', value: '81' },
 ] as const;
 
 export default function SpecimenScreen() {
@@ -21,6 +22,8 @@ export default function SpecimenScreen() {
 
   return (
     <ThemedScreen>
+      {/* The day's hero (the Today chunk builds the real layout on it). */}
+      <HeroBackdrop />
       <ScrollView
         className="flex-1"
         contentContainerClassName="items-center px-6"

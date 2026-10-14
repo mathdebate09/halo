@@ -15,7 +15,7 @@ import { useHaloTheme } from '@/theme/theme-provider';
 
 import { goBack } from './navigation';
 import { useOnboarding } from './state';
-import { FIRST_STEP, isStepId, progressOf } from './steps';
+import { FIRST_STEP, hasChrome, isStepId, progressOf } from './steps';
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
@@ -42,8 +42,8 @@ export function ProgressHeader() {
   const fillStyle = useAnimatedStyle(() => ({ width: fill.get() }));
 
   const canGoBack = step !== FIRST_STEP;
-  // Off-flow screens (the adult gate) have no position in the flow.
-  if (!inFlow) return null;
+  // Off-flow screens (the adult gate) and full-screen moments have no header.
+  if (!inFlow || !hasChrome(step)) return null;
 
   return (
     <View

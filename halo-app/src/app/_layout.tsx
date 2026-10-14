@@ -26,8 +26,9 @@ function RootNavigator() {
       <Stack
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.bg } }}>
         {/* Until onboarding completes only its flow is reachable; finishing flips to Today. */}
+        {/* Onboarding ↔ tabs swap with a fade, not a slide: the finale and Today share a hero. */}
         <Stack.Protected guard={onboarded}>
-          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
           <Stack.Screen
             name="log"
             options={{
@@ -38,7 +39,7 @@ function RootNavigator() {
           />
         </Stack.Protected>
         <Stack.Protected guard={!onboarded}>
-          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
         </Stack.Protected>
         <Stack.Screen name="dev" />
       </Stack>

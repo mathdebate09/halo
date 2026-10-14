@@ -22,8 +22,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const HERO_DIR = resolve(ROOT, '../references/hero');
 const OUT = join(ROOT, 'src/theme/themes.generated.json');
 const GLOBAL_CSS = join(ROOT, 'src/global.css');
-// Painted before any theme is chosen (first run); its tokens become the :root CSS defaults.
-const DEFAULT_THEME = 'mid-2';
+// First run and onboarding (the intro's mountain); its tokens become the :root CSS defaults.
+const DEFAULT_THEME = 'high-2';
 const CDN = 'https://ik.imagekit.io/jayowiee/halo/bg';
 
 const TIERS = ['high', 'mid', 'low'];

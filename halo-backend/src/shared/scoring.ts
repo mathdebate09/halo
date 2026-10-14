@@ -128,10 +128,7 @@ export function overallScore(components: OverallComponents): Overall {
   return { status: 'rated', value: round(sum / weight), rated };
 }
 
-/** The circle chips show a 0-100 component on a scale of 10, one decimal. */
-export const chipValue = (score: number) => round(score / 10, 1);
-
-/** Hero tiers: high 80-100, mid 50-79, low under 50. */
+/** Hero tiers: high 80-100, mid 50-79 (the 70s count as mid), low under 50. */
 export function tierFor(score: number): Tier {
   if (score >= 80) return 'high';
   if (score >= 50) return 'mid';
@@ -165,16 +162,14 @@ export function nextTier(current: Tier, score: number, lastChangeAt: Date | null
   return clear ? candidate : current;
 }
 
-/** FNV-1a: small, stable string hash. */
-function hash(text: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
-}
+export type HeroVariant = 1 | 2 | 3;
 
-/** Hero variant 1-3, fixed for a given day and tier (not random per render). */
-export const heroVariant = (dayKey: string, tier: Tier): 1 | 2 | 3 =>
-  ((hash(`${dayKey}:${tier}`) % 3) + 1) as 1 | 2 | 3;
+/**
+ * A random hero variant (1-3) for a tier, never repeating the previous pick for that tier.
+ * Called when a tier is chosen (onboarding, a tier change, a new day) and then persisted, so the
+ * hero stays put between renders.
+ */
+export function pickHeroVariant(previous?: HeroVariant, random: () => number = Math.random): HeroVariant {
+  const options = ([1, 2, 3] as const).filter((v) => v !== previous);
+  return options[Math.min(options.length - 1, Math.floor(random() * options.length))]!;
+}

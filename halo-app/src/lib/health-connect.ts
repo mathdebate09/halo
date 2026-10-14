@@ -2,6 +2,7 @@
 // normal states (SPEC §6), returned as values.
 
 import {
+  aggregateGroupByPeriod,
   getGrantedPermissions,
   getSdkStatus,
   initialize,
@@ -85,5 +86,32 @@ export async function readBodyMeasurements(): Promise<{ weightKg?: number; heigh
     };
   } catch {
     return {};
+  }
+}
+
+/**
+ * Average daily steps over the last `days` full days, counting only days with data (a phone left
+ * at home shouldn't read as a sedentary day). Null with fewer than 3 days of data.
+ */
+export async function readAverageSteps(days = 14): Promise<number | null> {
+  if (!(await ready()) || !(await isGranted('Steps'))) return null;
+  try {
+    const end = new Date();
+    end.setHours(0, 0, 0, 0);
+    const start = new Date(end.getTime() - days * 24 * 3600 * 1000);
+    const groups = await aggregateGroupByPeriod({
+      recordType: 'Steps',
+      timeRangeFilter: {
+        operator: 'between',
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+      },
+      timeRangeSlicer: { period: 'DAYS', length: 1 },
+    });
+    const counted = groups.map((g) => g.result.COUNT_TOTAL).filter((n) => n > 0);
+    if (counted.length < 3) return null;
+    return Math.round(counted.reduce((a, b) => a + b, 0) / counted.length);
+  } catch {
+    return null;
   }
 }

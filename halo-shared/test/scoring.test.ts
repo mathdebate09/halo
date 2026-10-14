@@ -2,13 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   activityScore,
-  chipValue,
   CONFIDENCE,
   dietScore,
   expectedIntakeFraction,
-  heroVariant,
   nextTier,
   overallScore,
+  pickHeroVariant,
   sleepScore,
   tierFor,
   waterScore,
@@ -89,10 +88,6 @@ describe('overall score', () => {
     });
     expect(result).toEqual({ status: 'rated', value: 74, rated: 2 }); // (3200 + 300) / 47.5
   });
-  it('formats chip values on a scale of 10', () => {
-    expect(chipValue(78)).toBe(7.8);
-    expect(chipValue(100)).toBe(10);
-  });
 });
 
 describe('tiers', () => {
@@ -114,13 +109,11 @@ describe('tiers', () => {
     expect(nextTier('mid', 90, at(12, 0), at(12, 20))).toBe('mid');
     expect(nextTier('mid', 90, at(12, 0), at(12, 31))).toBe('high');
   });
-  it('picks a stable hero variant per day and tier', () => {
-    const v = heroVariant('2026-10-14', 'mid');
-    expect([1, 2, 3]).toContain(v);
-    expect(heroVariant('2026-10-14', 'mid')).toBe(v);
-    const variants = new Set(
-      Array.from({ length: 30 }, (_, i) => heroVariant(`2026-11-${String(i + 1).padStart(2, '0')}`, 'high')),
-    );
-    expect(variants.size).toBe(3);
+  it('picks a random hero variant, never repeating the previous one', () => {
+    expect(pickHeroVariant(undefined, () => 0)).toBe(1);
+    expect(pickHeroVariant(undefined, () => 0.99)).toBe(3);
+    for (let i = 0; i < 50; i++) expect(pickHeroVariant(2)).not.toBe(2);
+    const seen = new Set(Array.from({ length: 200 }, () => pickHeroVariant()));
+    expect(seen).toEqual(new Set([1, 2, 3]));
   });
 });

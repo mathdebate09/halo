@@ -22,6 +22,8 @@ export type HealthConnectAnswer = {
   status: 'connected' | 'denied' | 'unavailable' | 'skipped';
   weightKg?: number;
   heightCm?: number;
+  /** 14-day average, refines the activity level in the plan. */
+  averageSteps?: number;
   at: number;
 };
 

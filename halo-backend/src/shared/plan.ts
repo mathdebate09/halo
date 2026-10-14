@@ -32,8 +32,31 @@ export const KCAL_PER_KG = 7700;
 export const CALORIE_FLOOR: Record<Sex, number> = { female: 1200, male: 1500 };
 export const MIN_BMI = 18.5;
 const MAX_LOSS_FRACTION_PER_WEEK = 0.01;
-const FAT_SHARE = 0.275;
-const PROTEIN_G_PER_KG: Record<Goal, number> = { lose: 1.8, maintain: 1.6, gain: 2.0 };
+
+/** Average daily steps → activity level (refines the "lightly active" default when known). */
+export function activityFromSteps(averageSteps: number): ActivityLevel {
+  if (averageSteps < 5000) return 'sedentary';
+  if (averageSteps < 7500) return 'light';
+  if (averageSteps < 10000) return 'moderate';
+  return 'active';
+}
+
+// Macro rules. Protein protects muscle (more in a deficit, when gaining, and from 60), fat stays
+// in a hormone-safe band, carbs keep the brain's ~130 g/day minimum, fiber scales with intake.
+const PROTEIN_G_PER_KG: Record<Goal, number> = { lose: 1.8, maintain: 1.4, gain: 2.0 };
+const PROTEIN_FASTER_LOSS = 2.0;
+const PROTEIN_OLDER_BONUS = 0.2; // age ≥ 60: anabolic resistance
+const PROTEIN_MIN_G_PER_KG: Record<Goal, number> = { lose: 1.6, maintain: 1.2, gain: 1.6 };
+const PROTEIN_MAX_SHARE = 0.35;
+const FAT_SHARE: Record<Goal, number> = { lose: 0.3, maintain: 0.3, gain: 0.25 };
+const FAT_MIN_SHARE = 0.2;
+const FAT_MAX_SHARE = 0.35;
+const FAT_MIN_G_PER_KG = 0.6;
+const CARBS_MIN_G = 130;
+const FIBER_G_PER_1000_KCAL = 14;
+const FIBER_MIN_G: Record<Sex, number> = { female: 25, male: 30 };
+const WATER_ML_PER_KG = 35;
+const REFERENCE_BMI = 25;
 
 export type PlanInput = {
   sex: Sex;
@@ -44,7 +67,10 @@ export type PlanInput = {
   /** Ignored when goal is 'maintain'. */
   goalWeightKg?: number;
   pace?: Pace;
+  /** Explicit level; otherwise derived from averageSteps; otherwise 'light'. */
   activity?: ActivityLevel;
+  /** 14-day average from Health Connect, when connected. */
+  averageSteps?: number;
   now?: Date;
 };
 
@@ -56,6 +82,13 @@ export type Plan = {
   proteinG: number;
   fatG: number;
   carbsG: number;
+  fiberG: number;
+  waterMl: number;
+  /** Activity level the TDEE used, and where it came from. */
+  activity: ActivityLevel;
+  activitySource: 'input' | 'steps' | 'default';
+  /** Weight protein and fat are scaled to (current, capped at BMI 25 unless gaining). */
+  referenceWeightKg: number;
   /** Signed kg/week actually planned (negative = loss). 0 for maintain. */
   rateKgPerWeek: number;
   goalWeightKg: number | null;
@@ -94,7 +127,15 @@ export function computePlan(input: PlanInput): Plan {
   const now = input.now ?? new Date();
   const age = ageOn(input.birthDate, now);
   const base = bmr(input.sex, input.weightKg, input.heightCm, age);
-  const tdee = base * ACTIVITY_MULTIPLIER[input.activity ?? 'light'];
+  const activity =
+    input.activity ??
+    (input.averageSteps != null ? activityFromSteps(input.averageSteps) : 'light');
+  const activitySource = input.activity
+    ? 'input'
+    : input.averageSteps != null
+      ? 'steps'
+      : 'default';
+  const tdee = base * ACTIVITY_MULTIPLIER[activity];
   const floor = CALORIE_FLOOR[input.sex];
 
   let goal = input.goal;
@@ -108,7 +149,10 @@ export function computePlan(input: PlanInput): Plan {
       goalWeightRaised = true;
     }
     // A goal on the wrong side of the current weight (or equal) has nothing to plan.
-    if ((goal === 'lose' && goalWeightKg >= input.weightKg) || (goal === 'gain' && goalWeightKg <= input.weightKg)) {
+    if (
+      (goal === 'lose' && goalWeightKg >= input.weightKg) ||
+      (goal === 'gain' && goalWeightKg <= input.weightKg)
+    ) {
       goal = 'maintain';
     }
   }
@@ -137,12 +181,15 @@ export function computePlan(input: PlanInput): Plan {
   }
 
   const targetKcal = Math.round(target / 10) * 10;
-  // Protein per kg of the lighter of current and goal weight when losing, so large bodies
-  // don't get an unreachable target.
-  const proteinBasis = goal === 'lose' && goalWeightKg != null ? Math.min(input.weightKg, goalWeightKg) : input.weightKg;
-  const proteinG = Math.round(proteinBasis * PROTEIN_G_PER_KG[goal]);
-  const fatG = Math.round((targetKcal * FAT_SHARE) / 9);
-  const carbsG = Math.max(0, Math.round((targetKcal - proteinG * 4 - fatG * 9) / 4));
+  const macros = computeMacros({
+    targetKcal,
+    goal,
+    pace: input.pace ?? 'steady',
+    sex: input.sex,
+    age,
+    weightKg: input.weightKg,
+    heightCm: input.heightCm,
+  });
 
   let weeksToGoal: number | null = null;
   let goalDate: Date | null = null;
@@ -156,9 +203,9 @@ export function computePlan(input: PlanInput): Plan {
     bmr: Math.round(base),
     tdee: Math.round(tdee),
     targetKcal,
-    proteinG,
-    fatG,
-    carbsG,
+    ...macros,
+    activity,
+    activitySource,
     rateKgPerWeek: goal === 'lose' ? -round(rate, 2) : goal === 'gain' ? round(rate, 2) : 0,
     goalWeightKg: goal === 'maintain' ? null : goalWeightKg,
     weeksToGoal,
@@ -166,6 +213,61 @@ export function computePlan(input: PlanInput): Plan {
     floorApplied,
     rateCapped,
     goalWeightRaised,
+  };
+}
+
+type MacroInput = {
+  targetKcal: number;
+  goal: Goal;
+  pace: Pace;
+  sex: Sex;
+  age: number;
+  weightKg: number;
+  heightCm: number;
+};
+
+/**
+ * Protein → fat → carbs, each within physiological bounds:
+ * - protein per kg of a reference weight (current, capped at the BMI-25 weight unless gaining, so
+ *   a large body doesn't get an unreachable target), higher for faster loss and from age 60,
+ *   capped at 35 % of calories
+ * - fat at 30 % (25 % when gaining), never under 0.6 g/kg nor over 35 % (the 35 % cap wins when a
+ *   low budget can't hold both)
+ * - carbs take the rest but keep 130 g: fat gives way first (to 20 %), then protein (to its minimum)
+ */
+export function computeMacros(m: MacroInput) {
+  const kcal = m.targetKcal;
+  const referenceWeightKg =
+    m.goal === 'gain' ? m.weightKg : Math.min(m.weightKg, REFERENCE_BMI * (m.heightCm / 100) ** 2);
+
+  let perKg =
+    m.goal === 'lose' && m.pace === 'faster' ? PROTEIN_FASTER_LOSS : PROTEIN_G_PER_KG[m.goal];
+  if (m.age >= 60) perKg += PROTEIN_OLDER_BONUS;
+  let protein = Math.min(referenceWeightKg * perKg, (kcal * PROTEIN_MAX_SHARE) / 4);
+
+  const fatFloor = Math.max((kcal * FAT_MIN_SHARE) / 9, referenceWeightKg * FAT_MIN_G_PER_KG);
+  let fat = Math.max((kcal * FAT_SHARE[m.goal]) / 9, referenceWeightKg * FAT_MIN_G_PER_KG);
+  fat = Math.min(fat, (kcal * FAT_MAX_SHARE) / 9);
+
+  const carbsFor = () => (kcal - protein * 4 - fat * 9) / 4;
+  let carbs = carbsFor();
+  if (carbs < CARBS_MIN_G) {
+    fat -= Math.min(Math.max(0, fat - fatFloor), ((CARBS_MIN_G - carbs) * 4) / 9);
+    carbs = carbsFor();
+  }
+  if (carbs < CARBS_MIN_G) {
+    const proteinFloor = referenceWeightKg * PROTEIN_MIN_G_PER_KG[m.goal];
+    protein -= Math.min(Math.max(0, protein - proteinFloor), CARBS_MIN_G - carbs);
+    carbs = carbsFor();
+  }
+
+  return {
+    proteinG: Math.round(protein),
+    fatG: Math.round(fat),
+    carbsG: Math.max(0, Math.round(carbs)),
+    fiberG: Math.round(Math.max((kcal / 1000) * FIBER_G_PER_1000_KCAL, FIBER_MIN_G[m.sex])),
+    waterMl: clamp(Math.round((m.weightKg * WATER_ML_PER_KG) / 50) * 50, 1500, 4000),
+    referenceWeightKg: round(referenceWeightKg, 1),
   };
 }
 

@@ -16,12 +16,23 @@ export const STEPS = [
   { id: 'weight' },
   // A target weight is meaningless when the goal is to eat better at the same weight.
   { id: 'goal-weight', skip: (a) => a.goal === 'maintain' || !a.goal },
-] as const satisfies readonly { id: string; skip?: (a: Answers) => boolean }[];
+  { id: 'pace', skip: (a) => a.goal === 'maintain' || !a.goal },
+  { id: 'name' },
+  // Full-screen moments: no progress header.
+  { id: 'building', chrome: false },
+  { id: 'result' },
+  { id: 'target' },
+  { id: 'ready', chrome: false },
+] as const satisfies readonly { id: string; skip?: (a: Answers) => boolean; chrome?: false }[];
 
 export type StepId = (typeof STEPS)[number]['id'];
 export const FIRST_STEP: StepId = STEPS[0].id;
 
-type Step = { id: StepId; skip?: (a: Answers) => boolean };
+type Step = { id: StepId; skip?: (a: Answers) => boolean; chrome?: false };
+
+/** Whether the step shows the progress header. */
+export const hasChrome = (id: StepId) =>
+  (STEPS as readonly Step[]).find((s) => s.id === id)?.chrome !== false;
 const visible = (answers: Answers) => (STEPS as readonly Step[]).filter((s) => !s.skip?.(answers));
 
 export function nextStep(current: StepId, answers: Answers): StepId | null {
