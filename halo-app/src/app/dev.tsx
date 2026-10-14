@@ -32,9 +32,17 @@ import {
 import { createMMKV } from 'react-native-mmkv';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { and, count, desc, eq, isNull, sum } from 'drizzle-orm';
+import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+
 import { HeroBackdrop } from '@/components/hero-backdrop';
 import { ThemedScreen } from '@/components/themed-screen';
 import { useHaloTheme } from '@/theme/theme-provider';
+import { db } from '@/db/client';
+import { deleteRecord, upsertRecord } from '@/db/mutate';
+import { outbox, water } from '@/db/schema';
+import { getDevice } from '@/lib/device';
+import { dayKey } from '@/shared';
 import { themeIds, zones } from '@/theme/themes';
 import Svg, { Path } from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
@@ -77,6 +85,55 @@ function Btn({ label, onPress }: { label: string; onPress: () => void }) {
     <Pressable onPress={onPress} className="rounded-pill bg-glass/10 px-4 py-2 active:bg-glass/20">
       <Text className="font-sans-medium text-[13px] text-text">{label}</Text>
     </Pressable>
+  );
+}
+
+function StoreRow() {
+  const today = dayKey(new Date());
+  const device = getDevice();
+  const { data: pending } = useLiveQuery(db.select({ n: count() }).from(outbox));
+  const { data: ops } = useLiveQuery(
+    db
+      .select({ entity: outbox.entity, op: outbox.op })
+      .from(outbox)
+      .orderBy(desc(outbox.seq))
+      .limit(4),
+  );
+  const { data: todayWater } = useLiveQuery(
+    db
+      .select({ ml: sum(water.ml), n: count() })
+      .from(water)
+      .where(and(eq(water.day, today), isNull(water.deletedAt))),
+    [today],
+  );
+  const last = () =>
+    db
+      .select({ id: water.id })
+      .from(water)
+      .where(and(eq(water.day, today), isNull(water.deletedAt)))
+      .orderBy(desc(water.at))
+      .get();
+
+  return (
+    <Row
+      title="Local store (SQLite + outbox)"
+      status={[
+        `device ${device?.id.slice(0, 8) ?? '—'}… · key ${device ? '•'.repeat(4) + device.key.slice(-4) : '—'}`,
+        `today ${today}: ${todayWater[0]?.ml ?? 0} ml water in ${todayWater[0]?.n ?? 0} logs`,
+        `outbox ${pending[0]?.n ?? 0} pending: ${ops.map((o) => `${o.op} ${o.entity}`).join(', ') || 'empty'}`,
+      ].join('\n')}>
+      <Btn
+        label="+ 250 ml water"
+        onPress={() => upsertRecord('water', { day: today, at: Date.now(), ml: 250 })}
+      />
+      <Btn
+        label="Delete last water"
+        onPress={() => {
+          const row = last();
+          if (row) deleteRecord('water', row.id);
+        }}
+      />
+    </Row>
   );
 }
 
@@ -186,6 +243,7 @@ export default function DevScreen() {
         <Text className="mb-4 font-serif text-[40px] text-text">Native modules</Text>
 
         <ThemesRow />
+        <StoreRow />
 
         <Row title="Fonts (embedded)" status="Serif, italic, sans and medium below">
           <Text className="font-serif text-[22px] text-text">Serif</Text>

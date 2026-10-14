@@ -7,6 +7,7 @@
     "@expo-google-fonts/instrument-serif": "^0.4.1",
     "@react-native-community/netinfo": "12.0.1",
     "@shopify/flash-list": "2.0.2",
+    "drizzle-orm": "^0.45.4",
     "expo": "~57.0.28",
     "expo-background-task": "~57.0.21",
     "expo-blur": "~57.0.3",
@@ -54,9 +55,11 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "babel-plugin-inline-import": "^3.0.0",
     "babel-preset-expo": "^57.0.15",
     "blurhash": "^2.0.5",
     "culori": "^4.0.2",
+    "drizzle-kit": "^0.31.11",
     "prettier-plugin-tailwindcss": "^0.5.14",
     "sharp": "^0.34.5",
     "tailwindcss": "^3.4.19",
@@ -64,12 +67,12 @@
   },
   "scripts": {
     "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "themes": "node scripts/build-themes.mjs"
+    "themes": "node scripts/build-themes.mjs",
+    "db:generate": "drizzle-kit generate"
   },
   "private": true
 }

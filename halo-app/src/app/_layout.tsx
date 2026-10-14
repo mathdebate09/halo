@@ -1,24 +1,56 @@
 import '../global.css';
 
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
-import { HaloThemeProvider } from '@/theme/theme-provider';
+import { LaunchSequence } from '@/components/launch-sequence';
+import { DataGate } from '@/db/data-gate';
+import { HaloThemeProvider, useHaloTheme } from '@/theme/theme-provider';
 
 // Fonts are embedded at build time by the expo-font config plugin (app.json), so nothing loads here.
+// The native splash stays until LaunchSequence has mounted an identical frame.
 SplashScreen.preventAutoHideAsync();
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+function RootNavigator() {
+  const { theme } = useHaloTheme();
+  const navigationTheme = {
+    ...DarkTheme,
+    colors: { ...DarkTheme.colors, background: theme.colors.bg, card: theme.colors.bg },
+  };
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <HaloThemeProvider>
-        <AnimatedSplashOverlay />
-        <AppTabs />
-      </HaloThemeProvider>
+    <ThemeProvider value={navigationTheme}>
+      <Stack
+        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.bg } }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="dev" />
+        <Stack.Screen
+          name="log"
+          options={{
+            presentation: 'transparentModal',
+            animation: 'fade',
+            contentStyle: { backgroundColor: 'transparent' },
+          }}
+        />
+      </Stack>
     </ThemeProvider>
   );
 }
+
+export default function RootLayout() {
+  return (
+    <GestureHandlerRootView style={styles.fill}>
+      <HaloThemeProvider>
+        <DataGate>
+          <RootNavigator />
+          <LaunchSequence />
+        </DataGate>
+      </HaloThemeProvider>
+    </GestureHandlerRootView>
+  );
+}
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+});

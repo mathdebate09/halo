@@ -26,3 +26,6 @@ halo-app/dist/
 # backend build output
 halo-backend/dist/
 halo-backend/coverage/
+
+# TypeScript incremental build info
+*.tsbuildinfo
