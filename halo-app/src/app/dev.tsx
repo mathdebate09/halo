@@ -42,6 +42,7 @@ import { db } from '@/db/client';
 import { deleteRecord, upsertRecord } from '@/db/mutate';
 import { outbox, water } from '@/db/schema';
 import { getDevice } from '@/lib/device';
+import { resetOnboarding, useOnboarding } from '@/onboarding/state';
 import { API_URL } from '@/sync/api';
 import { useSyncStatus } from '@/sync/status';
 import { runSync } from '@/sync/worker';
@@ -88,6 +89,22 @@ function Btn({ label, onPress }: { label: string; onPress: () => void }) {
     <Pressable onPress={onPress} className="rounded-pill bg-glass/10 px-4 py-2 active:bg-glass/20">
       <Text className="font-sans-medium text-[13px] text-text">{label}</Text>
     </Pressable>
+  );
+}
+
+function OnboardingRow() {
+  const state = useOnboarding();
+  return (
+    <Row
+      title="Onboarding"
+      status={[
+        state.completedAt
+          ? `completed ${new Date(state.completedAt).toLocaleString()}`
+          : `in progress at "${state.step}"`,
+        `answers: ${JSON.stringify(state.answers)}`,
+      ].join('\n')}>
+      <Btn label="Reset onboarding" onPress={resetOnboarding} />
+    </Row>
   );
 }
 
@@ -268,6 +285,7 @@ export default function DevScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 12 }}>
         <Text className="mb-4 font-serif text-[40px] text-text">Native modules</Text>
 
+        <OnboardingRow />
         <ThemesRow />
         <StoreRow />
         <SyncRow />

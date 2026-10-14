@@ -68,3 +68,27 @@ export function PlusIcon(props: IconProps) {
     </Line>
   );
 }
+
+export function ChevronLeftIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M14.5 5.5 8 12l6.5 6.5" />
+    </Line>
+  );
+}
+
+export function CheckIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="m5.5 12.5 4 4 9-9" />
+    </Line>
+  );
+}
+
+export function ScaleIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18V6A1.5 1.5 0 0 1 5 4.5zM9 9.5a4.2 4.2 0 0 1 6 0M12 11l1.2-1.6" />
+    </Line>
+  );
+}

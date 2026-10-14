@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { LaunchSequence } from '@/components/launch-sequence';
 import { DataGate } from '@/db/data-gate';
+import { useOnboarded } from '@/onboarding/state';
 import { HaloThemeProvider, useHaloTheme } from '@/theme/theme-provider';
 
 // Fonts are embedded at build time by the expo-font config plugin (app.json), so nothing loads here.
@@ -15,6 +16,7 @@ SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const { theme } = useHaloTheme();
+  const onboarded = useOnboarded();
   const navigationTheme = {
     ...DarkTheme,
     colors: { ...DarkTheme.colors, background: theme.colors.bg, card: theme.colors.bg },
@@ -23,16 +25,22 @@ function RootNavigator() {
     <ThemeProvider value={navigationTheme}>
       <Stack
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.bg } }}>
-        <Stack.Screen name="(tabs)" />
+        {/* Until onboarding completes only its flow is reachable; finishing flips to Today. */}
+        <Stack.Protected guard={onboarded}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen
+            name="log"
+            options={{
+              presentation: 'transparentModal',
+              animation: 'fade',
+              contentStyle: { backgroundColor: 'transparent' },
+            }}
+          />
+        </Stack.Protected>
+        <Stack.Protected guard={!onboarded}>
+          <Stack.Screen name="onboarding" />
+        </Stack.Protected>
         <Stack.Screen name="dev" />
-        <Stack.Screen
-          name="log"
-          options={{
-            presentation: 'transparentModal',
-            animation: 'fade',
-            contentStyle: { backgroundColor: 'transparent' },
-          }}
-        />
       </Stack>
     </ThemeProvider>
   );
