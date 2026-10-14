@@ -8,6 +8,13 @@
       "when": 1791993390664,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792006499787,
+      "tag": "0001_hc_daily_vitals",
+      "breakpoints": true
     }
   ]
 }

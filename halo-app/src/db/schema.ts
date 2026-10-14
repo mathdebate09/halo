@@ -163,6 +163,16 @@ export const hcDaily = sqliteTable('hc_daily', {
   activeKcal: real('active_kcal'),
   sleepStart: integer('sleep_start'),
   sleepEnd: integer('sleep_end'),
+  /** Asleep minutes for the night that ended on this day (awake stages excluded). */
+  sleepMin: integer('sleep_min'),
+  exerciseMin: integer('exercise_min'),
+  // The day's latest reading of each vital.
+  restingHr: real('resting_hr'),
+  hrvMs: real('hrv_ms'),
+  spo2: real('spo2'),
+  systolic: real('systolic'),
+  diastolic: real('diastolic'),
+  glucoseMgDl: real('glucose_mg_dl'),
   fetchedAt: integer('fetched_at').notNull(),
 });
 

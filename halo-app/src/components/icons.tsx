@@ -92,3 +92,19 @@ export function ScaleIcon(props: IconProps) {
     </Line>
   );
 }
+
+export function ShareIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M12 15V3.5M7.5 8 12 3.5 16.5 8M8 11H6.5A1.5 1.5 0 0 0 5 12.5v7A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-7a1.5 1.5 0 0 0-1.5-1.5H16" />
+    </Line>
+  );
+}
+
+export function DietIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M3.5 12h17a8.5 8.5 0 0 1-17 0zM9 8.5c0-1.5 1-2 1-3.5M13.5 8.5c0-1.5 1-2 1-3.5" />
+    </Line>
+  );
+}

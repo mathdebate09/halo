@@ -29,7 +29,7 @@ import {
   initialize,
   requestPermission,
 } from 'react-native-health-connect';
-import { createMMKV } from 'react-native-mmkv';
+import { createMMKV, useMMKVNumber, useMMKVString } from 'react-native-mmkv';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { router } from 'expo-router';
@@ -43,12 +43,15 @@ import { db } from '@/db/client';
 import { deleteRecord, upsertRecord } from '@/db/mutate';
 import { outbox, water } from '@/db/schema';
 import { getDevice } from '@/lib/device';
+import { kv } from '@/lib/kv';
 import { resetOnboarding, useOnboarding } from '@/onboarding/state';
 import { API_URL } from '@/sync/api';
 import { useSyncStatus } from '@/sync/status';
 import { runSync } from '@/sync/worker';
 import { dayKey } from '@/shared';
 import { themeIds, zones } from '@/theme/themes';
+import { readDayTier, writeDayTier } from '@/today/tier';
+import { DEV_SCORE_OVERRIDE_KEY } from '@/today/today-scores';
 import Svg, { Path } from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
 
@@ -187,6 +190,29 @@ function StoreRow() {
   );
 }
 
+const OVERRIDES = [90, 75, 60, 40] as const;
+
+/** Drives the Today tier from a fixed overall score, to check hysteresis and the hero crossfade. */
+function TodayRow() {
+  const [override, setOverride] = useMMKVNumber(DEV_SCORE_OVERRIDE_KEY, kv);
+  const record = useMMKVString('tier', kv)[0];
+  return (
+    <Row title="Today score" status={`override ${override ?? 'off'} · tier ${record ?? '—'}`}>
+      {OVERRIDES.map((n) => (
+        <Btn key={n} label={`${n}`} onPress={() => setOverride(n)} />
+      ))}
+      <Btn label="Off" onPress={() => setOverride(undefined)} />
+      <Btn
+        label="Unlock tier (clear changedAt)"
+        onPress={() => {
+          const current = readDayTier();
+          if (current) writeDayTier({ ...current, changedAt: null });
+        }}
+      />
+    </Row>
+  );
+}
+
 function ThemesRow() {
   const { theme, target, setThemeId } = useHaloTheme();
   const [preview, setPreview] = useState(false);
@@ -294,6 +320,7 @@ export default function DevScreen() {
 
         <OnboardingRow />
         <ThemesRow />
+        <TodayRow />
         <StoreRow />
         <SyncRow />
 

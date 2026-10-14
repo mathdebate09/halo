@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  activeKcalGoalFor,
   activityScore,
-  CONFIDENCE,
   dietScore,
   expectedIntakeFraction,
   nextTier,
   overallScore,
   pickHeroVariant,
   sleepScore,
+  stepGoalFor,
   tierFor,
+  vitalsScore,
   waterScore,
+  type MealLog,
 } from '../src/scoring';
 
 const at = (h: number, m = 0) => new Date(2026, 9, 14, h, m);
@@ -30,40 +33,77 @@ describe('expected intake curve', () => {
   });
 });
 
-describe('diet score is time-aware', () => {
-  const base = { targetKcal: 2000, targetProteinG: 120 };
-  it('is not rated before the first window opens', () => {
-    expect(dietScore({ ...base, kcal: 0, proteinG: 0, hour: 7 })).toBeNull();
+const meal = (mealType: MealLog['mealType'], hour: number, kcal: number, share = 1): MealLog => ({
+  mealType,
+  hour,
+  kcal,
+  proteinG: 120 * share,
+  carbsG: 250 * share,
+  fatG: 65 * share,
+});
+
+describe('diet score uses every logged value, relative to the time of day', () => {
+  const targets = { kcal: 2000, proteinG: 120, carbsG: 250, fatG: 65 };
+  it('is a time-only estimate with nothing logged: full early, gentle later', () => {
+    expect(dietScore({ meals: [], targets, hour: 6 })).toEqual({ value: 100, dataBacked: false });
+    const late = dietScore({ meals: [], targets, hour: 23 });
+    expect(late).toEqual({ value: 55, dataBacked: false });
   });
-  it('does not punish an empty morning that is on pace', () => {
-    const expected = expectedIntakeFraction(10.5);
+  it('scores an on-pace, on-time day at 100', () => {
+    // A full breakfast and a full lunch logged: "by now" is their 60 % share, not the curve's.
     const score = dietScore({
-      ...base,
-      kcal: 2000 * expected,
-      proteinG: 120 * expected,
-      hour: 10.5,
+      meals: [meal('breakfast', 8, 500, 0.25), meal('lunch', 13, 700, 0.35)],
+      targets,
+      hour: 13.5,
     });
-    expect(score).toBe(100);
+    expect(score.dataBacked).toBe(true);
+    expect(score.value).toBeGreaterThanOrEqual(95);
   });
-  it('drops when far behind pace in the evening', () => {
-    expect(dietScore({ ...base, kcal: 400, proteinG: 20, hour: 21 })!).toBeLessThan(30);
+  it('does not treat an early breakfast as overeating', () => {
+    const score = dietScore({ meals: [meal('breakfast', 6.5, 500, 0.25)], targets, hour: 6.5 });
+    expect(score.value).toBe(100);
+  });
+  it('drops when far behind in the evening, and for off-window meals', () => {
+    expect(dietScore({ meals: [meal('lunch', 13, 400, 0.15)], targets, hour: 21 }).value).toBeLessThan(40);
+    const onTime = dietScore({ meals: [meal('lunch', 13, 700, 0.35)], targets, hour: 15 }).value;
+    const late = dietScore({ meals: [meal('lunch', 17, 700, 0.35)], targets, hour: 17.5 }).value;
+    expect(late).toBeLessThan(onTime);
   });
   it('drops when overeating', () => {
-    expect(dietScore({ ...base, kcal: 3800, proteinG: 150, hour: 23 })!).toBeLessThan(60);
+    expect(dietScore({ meals: [meal('dinner', 20, 3800, 1.4)], targets, hour: 23 }).value).toBeLessThan(60);
   });
 });
 
-describe('activity, water, sleep', () => {
-  it('rates steps against pace, never above 100', () => {
-    expect(activityScore(0, 8000, 7.2)).toBeNull();
-    expect(activityScore(4000, 8000, 14)).toBe(100);
-    expect(activityScore(9000, 8000, 21)).toBe(100);
-    expect(activityScore(2000, 8000, 21)).toBe(25);
+describe('activity blends today with the last week', () => {
+  const goals = { steps: 8000, activeKcal: 300, exerciseMin: 30 };
+  it('falls back to the prior with no data at all', () => {
+    expect(activityScore({ hour: 14, today: {}, recent: [], goals })).toEqual({
+      value: 70,
+      dataBacked: false,
+    });
   });
-  it('does not score water until it has been logged once', () => {
-    expect(waterScore(0, 2000, 15, false)).toBeNull();
-    expect(waterScore(500, 2000, 14, true)).toBe(50);
+  it('leans on the week before the day starts', () => {
+    const recent = [{ steps: 8000, activeKcal: 300, exerciseMin: 30 }, { steps: 4000 }];
+    expect(activityScore({ hour: 6, today: { steps: 0 }, recent, goals })).toEqual({
+      value: 75,
+      dataBacked: true,
+    });
   });
+  it('is all today by the evening, against pace', () => {
+    const today = { steps: 4000, activeKcal: 150, exerciseMin: 15 };
+    expect(activityScore({ hour: 14, today, recent: [], goals }).value).toBe(100);
+    expect(activityScore({ hour: 21, today, recent: [{ steps: 20000 }], goals }).value).toBe(50);
+  });
+  it('derives goals from the plan and history', () => {
+    expect(stepGoalFor()).toBe(8000);
+    expect(stepGoalFor(5000)).toBe(8000);
+    expect(stepGoalFor(10000)).toBe(11000);
+    expect(activeKcalGoalFor(1600, 1920)).toBe(250);
+    expect(activeKcalGoalFor(1600, 2200)).toBe(440);
+  });
+});
+
+describe('vitals, water, sleep', () => {
   it('scores sleep against need', () => {
     expect(sleepScore(null)).toBeNull();
     expect(sleepScore(7.5)).toBe(100);
@@ -71,22 +111,42 @@ describe('activity, water, sleep', () => {
     expect(sleepScore(3.5)).toBe(0);
     expect(sleepScore(11.5)).toBe(80);
   });
+  it('blends sleep with whichever readings exist', () => {
+    expect(vitalsScore({})).toEqual({ value: 70, dataBacked: false });
+    expect(vitalsScore({ sleepHours: 7.5, restingHr: 58, spo2: 97 }).value).toBe(100);
+    const rough = vitalsScore({ sleepHours: 5.5, restingHr: 90, systolic: 150, diastolic: 95 });
+    expect(rough.value).toBeLessThan(60);
+  });
+  it('only reads HRV against a baseline', () => {
+    expect(vitalsScore({ hrvMs: 30 }).dataBacked).toBe(false);
+    expect(vitalsScore({ hrvMs: 30, hrvBaselineMs: 50 }).value).toBe(40);
+  });
+  it('does not score water until it has been logged once', () => {
+    expect(waterScore(0, 2000, 15, false)).toBeNull();
+    expect(waterScore(500, 2000, 14, true)).toBe(50);
+  });
 });
 
 describe('overall score', () => {
-  it('needs two rated components', () => {
-    expect(overallScore({ diet: { value: 90, confidence: CONFIDENCE.measured } })).toEqual({
-      status: 'getting-started',
-      rated: 1,
+  const prior = { value: 70, dataBacked: false };
+  it('is provisional with fewer than two data-backed components', () => {
+    expect(overallScore({ diet: prior, activity: prior, vitals: prior, water: null })).toEqual({
+      value: 70,
+      rated: 0,
+      provisional: true,
     });
+    const one = overallScore({ diet: { value: 100, dataBacked: true }, activity: prior, vitals: prior, water: null });
+    expect(one.provisional).toBe(true);
+    expect(one.value).toBeGreaterThan(70);
   });
   it('weights by importance and confidence, renormalized', () => {
     const result = overallScore({
-      diet: { value: 80, confidence: CONFIDENCE.measured }, // weight 40
-      activity: { value: 40, confidence: CONFIDENCE.assumed }, // weight 25 × 0.3 = 7.5
-      water: { value: null, confidence: CONFIDENCE.measured },
+      diet: { value: 80, dataBacked: true }, // 40
+      activity: { value: 40, dataBacked: true }, // 25
+      vitals: prior, // 25 × 0.3 = 7.5
+      water: null,
     });
-    expect(result).toEqual({ status: 'rated', value: 74, rated: 2 }); // (3200 + 300) / 47.5
+    expect(result).toEqual({ value: 65, rated: 2, provisional: false }); // (3200 + 1000 + 525) / 72.5
   });
 });
 
