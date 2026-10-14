@@ -30,6 +30,8 @@ export const meals = sqliteTable(
     note: text('note'),
     photoUri: text('photo_uri'), // compressed copy in the document directory; never uploaded for storage
     status: text('status').$type<MealStatus>().notNull(),
+    /** Short name for the meal, e.g. "Chicken rice bowl" (from the analysis, editable). */
+    title: text('title'),
     jobId: text('job_id'),
     kcal: real('kcal'),
     proteinG: real('protein_g'),

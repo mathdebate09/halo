@@ -7,6 +7,8 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { deleteRecord, upsertRecord } from '@/db/mutate';
 import { dayKey, hourOfDay, mealTypeAt } from '@/shared';
 
+import { requestAnalysis } from './analysis';
+
 const MAX_EDGE = 1024;
 
 /** ~1024 px JPEG in the cache; EXIF rotation is applied by the manipulator. */
@@ -52,6 +54,7 @@ export function saveMeal({
     photoUri: kept,
     status: 'analysing',
   });
+  requestAnalysis();
   return { id, photoUri: kept };
 }
 

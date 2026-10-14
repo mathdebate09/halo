@@ -82,6 +82,9 @@ export class AiService {
           model: this.env.DEEPSEEK_MODEL,
           messages,
           response_format: { type: 'json_object' },
+          // deepseek-flash reasons by default and spends max_tokens on it, leaving empty content.
+          // Estimates are as good without it (measured: ~1.3 s vs ~10 s at "low").
+          reasoning_effort: 'none',
           max_tokens: maxTokens,
           temperature: 0.2,
         }),

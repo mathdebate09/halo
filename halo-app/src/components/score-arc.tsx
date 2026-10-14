@@ -6,6 +6,7 @@ import Animated, {
   useAnimatedProps,
   useReducedMotion,
   useSharedValue,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import Svg, {
@@ -43,13 +44,20 @@ const PAD = 32; // room above the apex for the tick dots and beside the ends for
 const DRAW_FROM = 0.3;
 const CHANGE_MS = 700;
 
-type Props = { score: number; provisional: boolean; width: number; height: number };
+type Props = {
+  score: number;
+  provisional: boolean;
+  width: number;
+  height: number;
+  /** Bump to play the soft glow along the fill (a meal was just logged). */
+  glow?: number;
+};
 
 /**
  * The day's score as a fill along a shallow arc over the hero's focus point. The fill draws on
  * with the Reveal entrance and tweens when the score moves; a provisional score is drawn fainter.
  */
-export function ScoreArc({ score, provisional, width, height }: Props) {
+export function ScoreArc({ score, provisional, width, height, glow = 0 }: Props) {
   const { theme } = useHaloTheme();
   const reduced = useReducedMotion();
   const r = RADIUS * width;
@@ -90,6 +98,24 @@ export function ScoreArc({ score, provisional, width, height }: Props) {
     opacity.set(withTiming(provisional ? 0.8 : 1, { duration: motion.themeFade }));
   }, [provisional, opacity]);
   const groupProps = useAnimatedProps(() => ({ opacity: opacity.get() }));
+
+  // Celebration: a wide, soft copy of the fill swells and fades (~1 s) as the score moves.
+  const glowOpacity = useSharedValue(0);
+  useEffect(() => {
+    if (glow === 0 || reduced) return;
+    glowOpacity.set(
+      withSequence(
+        withTiming(0.45, { duration: 350, easing: motion.calm }),
+        withTiming(0, { duration: 700, easing: motion.calm }),
+      ),
+    );
+  }, [glow, reduced, glowOpacity]);
+  const glowProps = useAnimatedProps(() => ({ opacity: glowOpacity.get() }));
+  // Its own animated props: one useAnimatedProps object per component.
+  const glowFillProps = useAnimatedProps(() => {
+    const drawn = interpolate(launchReveal.get(), [DRAW_FROM, 1], [0, 1], Extrapolation.CLAMP);
+    return { strokeDashoffset: length * (1 - value.get() * drawn) };
+  });
 
   const arc = theme.colors.arc;
   const deg = (HALF_SWEEP * 180) / Math.PI;
@@ -134,6 +160,18 @@ export function ScoreArc({ score, provisional, width, height }: Props) {
           const p = point(t / 100, r + TICK_OUT);
           return <Circle key={t} cx={p.x} cy={p.y} r={2.5} fill={arc} fillOpacity={0.7} />;
         })}
+        <AnimatedG animatedProps={glowProps}>
+          <AnimatedPath
+            d={arcPath}
+            stroke={arc}
+            strokeWidth={STROKE * 2.6}
+            strokeOpacity={0.5}
+            strokeLinecap="round"
+            strokeDasharray={[length, length]}
+            fill="none"
+            animatedProps={glowFillProps}
+          />
+        </AnimatedG>
         <AnimatedG animatedProps={groupProps}>
           <AnimatedPath
             d={arcPath}

@@ -18,6 +18,7 @@ import {
   addDays,
   dayKey,
   dietScore,
+  expectedIntakeFraction,
   EXERCISE_GOAL_MIN,
   hourOfDay,
   overallScore,
@@ -43,6 +44,8 @@ export type TodayScores = {
   overall: number;
   /** Fewer than two components backed by real data: shown, but never moves the tier. */
   provisional: boolean;
+  /** Today's logged intake against where it should be by now (meal reactions). */
+  intake: { kcal: number; proteinG: number; expectedKcal: number; expectedProteinG: number };
 };
 
 const TodayContext = createContext<TodayScores | null>(null);
@@ -124,6 +127,11 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
 
   const hour = hourOfDay(now);
 
+  const targetKcal = plan?.targetKcal ?? 2000;
+  const targetProteinG = plan?.proteinG ?? 100;
+  // Once a meal is in, "by now" is at least a breakfast's share (matches dietScore's floor).
+  const due = Math.max(expectedIntakeFraction(hour), mealRows.length ? 0.25 : 0);
+
   const diet = dietScore({
     meals: mealRows.map((m) => ({
       mealType: m.mealType,
@@ -134,8 +142,8 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
       fatG: num(m.fatG),
     })),
     targets: {
-      kcal: plan?.targetKcal ?? 2000,
-      proteinG: plan?.proteinG ?? 100,
+      kcal: targetKcal,
+      proteinG: targetProteinG,
       carbsG: plan?.carbsG ?? 250,
       fatG: plan?.fatG ?? 65,
     },
@@ -193,6 +201,12 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
     vitals,
     overall,
     provisional: rated == null,
+    intake: {
+      kcal: mealRows.reduce((a, m) => a + num(m.kcal), 0),
+      proteinG: mealRows.reduce((a, m) => a + num(m.proteinG), 0),
+      expectedKcal: targetKcal * due,
+      expectedProteinG: targetProteinG * due,
+    },
   };
   return <TodayContext value={value}>{children}</TodayContext>;
 }

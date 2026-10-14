@@ -15,6 +15,13 @@
       "when": 1792006499787,
       "tag": "0001_hc_daily_vitals",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792009440976,
+      "tag": "0002_meal_title",
+      "breakpoints": true
     }
   ]
 }

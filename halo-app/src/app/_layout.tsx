@@ -46,6 +46,14 @@ function RootNavigator() {
               contentStyle: { backgroundColor: 'transparent' },
             }}
           />
+          <Stack.Screen
+            name="meal/[id]"
+            options={{
+              presentation: 'transparentModal',
+              animation: 'fade',
+              contentStyle: { backgroundColor: 'transparent' },
+            }}
+          />
           <Stack.Screen name="advisor" />
         </Stack.Protected>
         <Stack.Protected guard={!onboarded}>

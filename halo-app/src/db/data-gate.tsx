@@ -3,6 +3,7 @@ import { type ReactNode, useEffect } from 'react';
 import { Text, View } from 'react-native';
 
 import { ensureDevice } from '@/lib/device';
+import { startMealAnalysis } from '@/meals/analysis';
 import { startSyncWorker } from '@/sync/worker';
 
 import migrations from '../../drizzle/migrations';
@@ -18,7 +19,12 @@ export function DataGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!success) return;
     ensureDevice();
-    return startSyncWorker();
+    const stopSync = startSyncWorker();
+    const stopAnalysis = startMealAnalysis();
+    return () => {
+      stopSync();
+      stopAnalysis();
+    };
   }, [success]);
 
   if (error) {

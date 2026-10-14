@@ -28,11 +28,11 @@ export class ApiError extends Error {
 /** JSON request with device headers and a timeout. Throws ApiError (HTTP) or a network error. */
 export async function api<T>(
   path: string,
-  init: { method?: string; body?: unknown } = {},
+  init: { method?: string; body?: unknown; timeoutMs?: number } = {},
 ): Promise<T> {
   const device = getDevice();
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? TIMEOUT_MS);
   try {
     const res = await fetch(`${API_URL}${path}`, {
       method: init.method ?? 'GET',

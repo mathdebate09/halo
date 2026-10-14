@@ -24,6 +24,13 @@ function hide(id: number) {
   emit();
 }
 
+/** Extra bottom space claimed by something floating above the dock (the pending meal card). */
+let lift = 0;
+export function setToastLift(px: number) {
+  lift = px;
+  emit();
+}
+
 const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => listeners.delete(l);
@@ -34,6 +41,7 @@ const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
 export function ToastHost() {
   const toast = useSyncExternalStore(subscribe, () => current);
+  const extra = useSyncExternalStore(subscribe, () => lift);
   const insets = useSafeAreaInsets();
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -52,7 +60,7 @@ export function ToastHost() {
       exiting={FadeOutDown.duration(250)}
       pointerEvents="box-none"
       // Plain style only: NativeWind drops `style` on an Animated.View that also has className.
-      style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 108 }}>
+      style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 108 + extra }}>
       <Animated.View
         accessibilityLiveRegion="polite"
         className="flex-row items-center rounded-pill border border-hairline/10 bg-surface py-1.5 pl-5 pr-1.5">

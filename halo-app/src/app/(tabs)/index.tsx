@@ -12,11 +12,13 @@ import { ScoreArc, ScoreScrim } from '@/components/score-arc';
 import { ScoreChip } from '@/components/score-chip';
 import { ThemedScreen } from '@/components/themed-screen';
 import { refreshHealthData } from '@/lib/health-connect';
+import { PendingMealCard } from '@/meals/pending-meal-card';
 import { hourOfDay } from '@/shared';
 import { motion } from '@/theme/motion';
 import { useHaloTheme } from '@/theme/theme-provider';
 import { todayCopy } from '@/today/copy';
 import { prefetchHeroes } from '@/today/prefetch';
+import { useMealCelebration } from '@/today/celebration';
 import { useTodayScores } from '@/today/today-scores';
 
 // Today's hero, laid out like Oura's home on screen-height fractions so the arc sits over the
@@ -36,6 +38,7 @@ export default function TodayScreen() {
   const [size, setSize] = useState({ width: window.width, height: window.height });
   const { theme, target } = useHaloTheme();
   const scores = useTodayScores();
+  const glow = useMealCelebration(scores);
   const copy = todayCopy(target.tier, scores.day, hourOfDay(scores.now), scores.provisional);
   const { width, height } = size;
 
@@ -108,6 +111,7 @@ export default function TodayScreen() {
           <ScoreArc
             score={scores.overall}
             provisional={scores.provisional}
+            glow={glow}
             width={width}
             height={height}
           />
@@ -161,6 +165,8 @@ export default function TodayScreen() {
           </Reveal>
         </View>
       </View>
+      {/* Meals between capture and logging (the timeline arrives in chunk 14). */}
+      <PendingMealCard />
     </ThemedScreen>
   );
 }

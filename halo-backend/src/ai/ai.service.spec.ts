@@ -33,7 +33,12 @@ describe('AiService', () => {
     fetchMock.mockResolvedValueOnce(reply('{"ok":true}'));
     await expect(new AiService(env('k')).json(request)).resolves.toEqual({ ok: true });
     const body = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string);
-    expect(body).toMatchObject({ model: 'deepseek-flash', response_format: { type: 'json_object' }, max_tokens: 50 });
+    expect(body).toMatchObject({
+      model: 'deepseek-flash',
+      response_format: { type: 'json_object' },
+      reasoning_effort: 'none',
+      max_tokens: 50,
+    });
   });
 
   it('retries once on a 5xx, empty content or an invalid shape', async () => {
