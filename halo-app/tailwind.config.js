@@ -1,7 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 
 // Colors resolve from CSS variables (space-separated RGB channels) so the theme can be swapped
-// at runtime per hero image. Values live in src/global.css until the theme pipeline generates them.
+// at runtime per hero image (src/theme). Defaults in src/global.css come from scripts/build-themes.mjs.
 const token = (name) => `rgb(var(--c-${name}) / <alpha-value>)`;
 
 module.exports = {
@@ -18,6 +18,13 @@ module.exports = {
         muted: token('muted'),
         accent: token('accent'),
         'on-accent': token('on-accent'),
+        arc: token('arc'),
+        dock: token('dock'),
+        veil: token('veil'),
+        // State words (Oura-style): never plain red/green.
+        strength: token('strength'),
+        steady: token('steady'),
+        opportunity: token('opportunity'),
       },
       // One family per weight: Android can't synthesize weights for custom fonts,
       // so never pair these with font-medium / font-bold.

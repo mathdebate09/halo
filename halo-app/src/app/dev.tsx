@@ -13,7 +13,15 @@ import * as Notifications from 'expo-notifications';
 import * as Sharing from 'expo-sharing';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { type ReactNode, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import {
   SdkAvailabilityStatus,
   aggregateRecord,
@@ -23,6 +31,11 @@ import {
 } from 'react-native-health-connect';
 import { createMMKV } from 'react-native-mmkv';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { HeroBackdrop } from '@/components/hero-backdrop';
+import { ThemedScreen } from '@/components/themed-screen';
+import { useHaloTheme } from '@/theme/theme-provider';
+import { themeIds, zones } from '@/theme/themes';
 import Svg, { Path } from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
 
@@ -67,6 +80,77 @@ function Btn({ label, onPress }: { label: string; onPress: () => void }) {
   );
 }
 
+function ThemesRow() {
+  const { theme, target, setThemeId } = useHaloTheme();
+  const [preview, setPreview] = useState(false);
+  const { height } = useWindowDimensions();
+  const next = () => setThemeId(themeIds[(themeIds.indexOf(target.id) + 1) % themeIds.length]);
+
+  return (
+    <Row
+      title="Themes"
+      status={`${target.id} · veil ${target.veil.alpha} · contrast ${target.contrast.tagline}/${target.contrast.body}`}>
+      {themeIds.map((id) => (
+        <Pressable
+          key={id}
+          onPress={() => setThemeId(id)}
+          className={`rounded-pill px-3 py-1.5 ${id === target.id ? 'bg-accent' : 'bg-glass/10'}`}>
+          <Text
+            className={`font-sans-medium text-[13px] ${id === target.id ? 'text-on-accent' : 'text-text'}`}>
+            {id}
+          </Text>
+        </Pressable>
+      ))}
+      <Btn label="Preview hero" onPress={() => setPreview(true)} />
+
+      <Modal
+        visible={preview}
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setPreview(false)}>
+        <Pressable onPress={next} className="flex-1 bg-bg">
+          <HeroBackdrop />
+          <Text className="absolute left-6 top-12 font-sans text-[13px] text-text/80">
+            {theme.id} · tap to cycle
+          </Text>
+          <Pressable
+            onPress={() => setPreview(false)}
+            className="absolute right-6 top-10 rounded-pill bg-glass/15 px-4 py-2">
+            <Text className="font-sans-medium text-[13px] text-text">Close</Text>
+          </Pressable>
+          <Text
+            style={{ top: height * 0.36 }}
+            className="absolute inset-x-0 text-center font-serif text-[96px] leading-[104px] text-text">
+            82
+          </Text>
+          <Text
+            style={{ top: height * zones.tagline[0] }}
+            className="absolute inset-x-0 text-center font-serif text-[46px] leading-[52px] text-text">
+            Go get ’em
+          </Text>
+          <Text
+            style={{ top: height * zones.body[0] }}
+            className="absolute inset-x-8 text-center font-sans text-[17px] leading-[26px] text-text/90">
+            Breakfast landed right on pace and your steps are ahead of yesterday. A protein-rich
+            lunch keeps the momentum going.
+          </Text>
+          <View
+            style={{ top: height * 0.86 }}
+            className="absolute inset-x-6 flex-row justify-between">
+            <Text className="font-sans-medium text-[13px] tracking-[2px] text-strength">
+              THRIVING
+            </Text>
+            <Text className="font-sans-medium text-[13px] tracking-[2px] text-steady">STEADY</Text>
+            <Text className="font-sans-medium text-[13px] tracking-[2px] text-opportunity">
+              NEEDS CARE
+            </Text>
+          </View>
+        </Pressable>
+      </Modal>
+    </Row>
+  );
+}
+
 export default function DevScreen() {
   const insets = useSafeAreaInsets();
   const [status, setStatus] = useState<Record<string, string>>({});
@@ -94,245 +178,251 @@ export default function DevScreen() {
   };
 
   return (
-    <ScrollView
-      className="flex-1 bg-bg"
-      contentContainerClassName="px-4 pb-32"
-      contentContainerStyle={{ paddingTop: insets.top + 12 }}>
-      <Text className="mb-4 font-serif text-[40px] text-text">Native modules</Text>
+    <ThemedScreen>
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="px-4 pb-32"
+        contentContainerStyle={{ paddingTop: insets.top + 12 }}>
+        <Text className="mb-4 font-serif text-[40px] text-text">Native modules</Text>
 
-      <Row title="Fonts (embedded)" status="Serif, italic, sans and medium below">
-        <Text className="font-serif text-[22px] text-text">Serif</Text>
-        <Text className="font-serif-italic text-[22px] text-text">Italic</Text>
-        <Text className="font-sans text-[18px] text-text">Sans</Text>
-        <Text className="font-sans-medium text-[18px] text-text">Medium</Text>
-      </Row>
+        <ThemesRow />
 
-      <Row title="MMKV" status={s('mmkv')}>
-        <Btn
-          label="Increment"
-          onPress={() => {
-            const next = (storage.getNumber('count') ?? 0) + 1;
-            storage.set('count', next);
-            set('mmkv', `count = ${storage.getNumber('count')}`);
-          }}
-        />
-      </Row>
+        <Row title="Fonts (embedded)" status="Serif, italic, sans and medium below">
+          <Text className="font-serif text-[22px] text-text">Serif</Text>
+          <Text className="font-serif-italic text-[22px] text-text">Italic</Text>
+          <Text className="font-sans text-[18px] text-text">Sans</Text>
+          <Text className="font-sans-medium text-[18px] text-text">Medium</Text>
+        </Row>
 
-      <Row
-        title="Camera"
-        status={cameraPermission?.granted ? 'granted' : (cameraPermission?.status ?? '—')}>
-        <Btn label="Request" onPress={requestCameraPermission} />
-        <Btn
-          label={showCamera ? 'Hide preview' : 'Show preview'}
-          onPress={() => setShowCamera((v) => !v)}
-        />
-      </Row>
-      {showCamera && cameraPermission?.granted ? (
-        <View className="mb-3 h-56 overflow-hidden rounded-card">
-          <BlurTargetView ref={blurTargetRef} style={StyleSheet.absoluteFill}>
-            <CameraView facing="back" style={{ flex: 1 }} />
-          </BlurTargetView>
-          <BlurView
-            blurTarget={blurTargetRef}
-            blurMethod="dimezisBlurViewSdk31Plus"
-            intensity={60}
-            tint="dark"
-            style={styles.blurBand}>
-            <Text className="font-serif text-[28px] text-text">Meal Logger</Text>
-          </BlurView>
+        <Row title="MMKV" status={s('mmkv')}>
+          <Btn
+            label="Increment"
+            onPress={() => {
+              const next = (storage.getNumber('count') ?? 0) + 1;
+              storage.set('count', next);
+              set('mmkv', `count = ${storage.getNumber('count')}`);
+            }}
+          />
+        </Row>
+
+        <Row
+          title="Camera"
+          status={cameraPermission?.granted ? 'granted' : (cameraPermission?.status ?? '—')}>
+          <Btn label="Request" onPress={requestCameraPermission} />
+          <Btn
+            label={showCamera ? 'Hide preview' : 'Show preview'}
+            onPress={() => setShowCamera((v) => !v)}
+          />
+        </Row>
+        {showCamera && cameraPermission?.granted ? (
+          <View className="mb-3 h-56 overflow-hidden rounded-card">
+            <BlurTargetView ref={blurTargetRef} style={StyleSheet.absoluteFill}>
+              <CameraView facing="back" style={{ flex: 1 }} />
+            </BlurTargetView>
+            <BlurView
+              blurTarget={blurTargetRef}
+              blurMethod="dimezisBlurViewSdk31Plus"
+              intensity={60}
+              tint="dark"
+              style={styles.blurBand}>
+              <Text className="font-serif text-[28px] text-text">Meal Logger</Text>
+            </BlurView>
+          </View>
+        ) : null}
+
+        <Row title="Image picker + manipulator" status={s('picker')}>
+          <Btn
+            label="Pick + resize 1024"
+            onPress={run('picker', async () => {
+              const res = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+              });
+              if (res.canceled) return 'cancelled';
+              const ref = await ImageManipulator.manipulate(res.assets[0].uri)
+                .resize({ width: 1024 })
+                .renderAsync();
+              const out = await ref.saveAsync({
+                compress: 0.8,
+                format: SaveFormat.JPEG,
+              });
+              return `${res.assets[0].width}×${res.assets[0].height} → ${out.width}×${out.height}`;
+            })}
+          />
+        </Row>
+
+        <Row title="PDF renderer (local module)" status={s('pdf')}>
+          <Btn
+            label="Pick PDF"
+            onPress={run('pdf', async () => {
+              const res = await DocumentPicker.getDocumentAsync({
+                type: 'application/pdf',
+                copyToCacheDirectory: true,
+              });
+              if (res.canceled) return 'cancelled';
+              const uri = res.assets[0].uri;
+              const count = await PdfRenderer.getPageCount(uri);
+              const page = await PdfRenderer.renderPage(uri, 0, 1600, 80);
+              setPdfPage(page.uri);
+              return `${count} pages, page 1 → ${page.width}×${page.height}`;
+            })}
+          />
+          <Btn
+            label="Clear cache"
+            onPress={run('pdf', async () => {
+              const dir = new Directory(Paths.cache, 'pdf-pages');
+              if (dir.exists) dir.delete();
+              setPdfPage(null);
+              return 'pdf-pages deleted';
+            })}
+          />
+        </Row>
+        {pdfPage ? (
+          <Image source={{ uri: pdfPage }} contentFit="contain" style={styles.pdfPage} />
+        ) : null}
+
+        <View
+          ref={shotRef}
+          collapsable={false}
+          className="mb-3 items-center rounded-card bg-surface p-5">
+          <Svg width={180} height={70} viewBox="0 0 180 70">
+            <Path
+              d="M10 65 A80 80 0 0 1 170 65"
+              stroke="rgb(241 239 233)"
+              strokeOpacity={0.25}
+              strokeWidth={4}
+              fill="none"
+              strokeLinecap="round"
+            />
+            <Path
+              d="M10 65 A80 80 0 0 1 140 22"
+              stroke="rgb(241 239 233)"
+              strokeWidth={4}
+              fill="none"
+              strokeLinecap="round"
+            />
+          </Svg>
+          <Text className="font-serif text-[36px] text-text">82</Text>
         </View>
-      ) : null}
-
-      <Row title="Image picker + manipulator" status={s('picker')}>
-        <Btn
-          label="Pick + resize 1024"
-          onPress={run('picker', async () => {
-            const res = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ['images'],
-            });
-            if (res.canceled) return 'cancelled';
-            const ref = await ImageManipulator.manipulate(res.assets[0].uri)
-              .resize({ width: 1024 })
-              .renderAsync();
-            const out = await ref.saveAsync({
-              compress: 0.8,
-              format: SaveFormat.JPEG,
-            });
-            return `${res.assets[0].width}×${res.assets[0].height} → ${out.width}×${out.height}`;
-          })}
-        />
-      </Row>
-
-      <Row title="PDF renderer (local module)" status={s('pdf')}>
-        <Btn
-          label="Pick PDF"
-          onPress={run('pdf', async () => {
-            const res = await DocumentPicker.getDocumentAsync({
-              type: 'application/pdf',
-              copyToCacheDirectory: true,
-            });
-            if (res.canceled) return 'cancelled';
-            const uri = res.assets[0].uri;
-            const count = await PdfRenderer.getPageCount(uri);
-            const page = await PdfRenderer.renderPage(uri, 0, 1600, 80);
-            setPdfPage(page.uri);
-            return `${count} pages, page 1 → ${page.width}×${page.height}`;
-          })}
-        />
-        <Btn
-          label="Clear cache"
-          onPress={run('pdf', async () => {
-            const dir = new Directory(Paths.cache, 'pdf-pages');
-            if (dir.exists) dir.delete();
-            setPdfPage(null);
-            return 'pdf-pages deleted';
-          })}
-        />
-      </Row>
-      {pdfPage ? (
-        <Image source={{ uri: pdfPage }} contentFit="contain" style={styles.pdfPage} />
-      ) : null}
-
-      <View
-        ref={shotRef}
-        collapsable={false}
-        className="mb-3 items-center rounded-card bg-surface p-5">
-        <Svg width={180} height={70} viewBox="0 0 180 70">
-          <Path
-            d="M10 65 A80 80 0 0 1 170 65"
-            stroke="rgb(241 239 233)"
-            strokeOpacity={0.25}
-            strokeWidth={4}
-            fill="none"
-            strokeLinecap="round"
+        <Row title="SVG + view-shot + sharing + media library" status={s('shot')}>
+          <Btn
+            label="Capture"
+            onPress={run('shot', async () => {
+              lastCapture.current = await captureRef(shotRef, {
+                format: 'png',
+                quality: 1,
+              });
+              return `captured ${lastCapture.current.split('/').pop()}`;
+            })}
           />
-          <Path
-            d="M10 65 A80 80 0 0 1 140 22"
-            stroke="rgb(241 239 233)"
-            strokeWidth={4}
-            fill="none"
-            strokeLinecap="round"
+          <Btn
+            label="Share"
+            onPress={run('shot', async () => {
+              if (!lastCapture.current) return 'capture first';
+              await Sharing.shareAsync(lastCapture.current, {
+                mimeType: 'image/png',
+              });
+              return 'share sheet closed';
+            })}
           />
-        </Svg>
-        <Text className="font-serif text-[36px] text-text">82</Text>
-      </View>
-      <Row title="SVG + view-shot + sharing + media library" status={s('shot')}>
-        <Btn
-          label="Capture"
-          onPress={run('shot', async () => {
-            lastCapture.current = await captureRef(shotRef, {
-              format: 'png',
-              quality: 1,
-            });
-            return `captured ${lastCapture.current.split('/').pop()}`;
-          })}
-        />
-        <Btn
-          label="Share"
-          onPress={run('shot', async () => {
-            if (!lastCapture.current) return 'capture first';
-            await Sharing.shareAsync(lastCapture.current, {
-              mimeType: 'image/png',
-            });
-            return 'share sheet closed';
-          })}
-        />
-        <Btn
-          label="Save to gallery"
-          onPress={run('shot', async () => {
-            if (!lastCapture.current) return 'capture first';
-            const perm = await requestMediaPermissions(true);
-            if (!perm.granted) return 'media permission denied';
-            const asset = await Asset.create(lastCapture.current);
-            return `saved ${asset.id}`;
-          })}
-        />
-      </Row>
+          <Btn
+            label="Save to gallery"
+            onPress={run('shot', async () => {
+              if (!lastCapture.current) return 'capture first';
+              const perm = await requestMediaPermissions(true);
+              if (!perm.granted) return 'media permission denied';
+              const asset = await Asset.create(lastCapture.current);
+              return `saved ${asset.id}`;
+            })}
+          />
+        </Row>
 
-      <Row title="Notifications" status={s('notif')}>
-        <Btn
-          label="Notify in 5 s"
-          onPress={run('notif', async () => {
-            const perm = await Notifications.requestPermissionsAsync();
-            if (!perm.granted) return 'permission denied';
-            await Notifications.scheduleNotificationAsync({
-              content: { title: 'Halo', body: 'Lunch is usually around 1.' },
-              trigger: {
-                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                seconds: 5,
-              },
-            });
-            return 'scheduled';
-          })}
-        />
-      </Row>
+        <Row title="Notifications" status={s('notif')}>
+          <Btn
+            label="Notify in 5 s"
+            onPress={run('notif', async () => {
+              const perm = await Notifications.requestPermissionsAsync();
+              if (!perm.granted) return 'permission denied';
+              await Notifications.scheduleNotificationAsync({
+                content: { title: 'Halo', body: 'Lunch is usually around 1.' },
+                trigger: {
+                  type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                  seconds: 5,
+                },
+              });
+              return 'scheduled';
+            })}
+          />
+        </Row>
 
-      <Row title="Health Connect" status={s('hc')}>
-        <Btn
-          label="Status"
-          onPress={run('hc', async () => {
-            const sdk = await getSdkStatus();
-            return sdk === SdkAvailabilityStatus.SDK_AVAILABLE
-              ? 'available'
-              : `unavailable (status ${sdk})`;
-          })}
-        />
-        <Btn
-          label="Steps today"
-          onPress={run('hc', async () => {
-            if (!(await initialize())) return 'init failed';
-            const granted = await requestPermission([{ accessType: 'read', recordType: 'Steps' }]);
-            if (!granted.length) return 'permission denied';
-            const start = new Date();
-            start.setHours(0, 0, 0, 0);
-            const res = await aggregateRecord({
-              recordType: 'Steps',
-              timeRangeFilter: {
-                operator: 'between',
-                startTime: start.toISOString(),
-                endTime: new Date().toISOString(),
-              },
-            });
-            return `${res.COUNT_TOTAL} steps (${res.dataOrigins.join(', ') || 'no sources'})`;
-          })}
-        />
-      </Row>
+        <Row title="Health Connect" status={s('hc')}>
+          <Btn
+            label="Status"
+            onPress={run('hc', async () => {
+              const sdk = await getSdkStatus();
+              return sdk === SdkAvailabilityStatus.SDK_AVAILABLE
+                ? 'available'
+                : `unavailable (status ${sdk})`;
+            })}
+          />
+          <Btn
+            label="Steps today"
+            onPress={run('hc', async () => {
+              if (!(await initialize())) return 'init failed';
+              const granted = await requestPermission([
+                { accessType: 'read', recordType: 'Steps' },
+              ]);
+              if (!granted.length) return 'permission denied';
+              const start = new Date();
+              start.setHours(0, 0, 0, 0);
+              const res = await aggregateRecord({
+                recordType: 'Steps',
+                timeRangeFilter: {
+                  operator: 'between',
+                  startTime: start.toISOString(),
+                  endTime: new Date().toISOString(),
+                },
+              });
+              return `${res.COUNT_TOTAL} steps (${res.dataOrigins.join(', ') || 'no sources'})`;
+            })}
+          />
+        </Row>
 
-      <Row title="Speech recognition" status={transcript || s('speech')}>
-        <Btn
-          label="Listen"
-          onPress={run('speech', async () => {
-            if (!ExpoSpeechRecognitionModule.isRecognitionAvailable())
-              return 'not available on this device';
-            const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-            if (!perm.granted) return 'permission denied';
-            setTranscript('');
-            ExpoSpeechRecognitionModule.start({
-              lang: 'en-US',
-              interimResults: true,
-            });
-            return 'listening…';
-          })}
-        />
-        <Btn label="Stop" onPress={() => ExpoSpeechRecognitionModule.stop()} />
-      </Row>
+        <Row title="Speech recognition" status={transcript || s('speech')}>
+          <Btn
+            label="Listen"
+            onPress={run('speech', async () => {
+              if (!ExpoSpeechRecognitionModule.isRecognitionAvailable())
+                return 'not available on this device';
+              const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+              if (!perm.granted) return 'permission denied';
+              setTranscript('');
+              ExpoSpeechRecognitionModule.start({
+                lang: 'en-US',
+                interimResults: true,
+              });
+              return 'listening…';
+            })}
+          />
+          <Btn label="Stop" onPress={() => ExpoSpeechRecognitionModule.stop()} />
+        </Row>
 
-      <Row title="System" status={s('system')}>
-        <Btn
-          label="Read"
-          onPress={run('system', async () => {
-            const net = await NetInfo.fetch();
-            const locale = getLocales()[0];
-            const bg = await BackgroundTask.getStatusAsync();
-            return [
-              `net: ${net.type}, connected ${net.isConnected}`,
-              `locale: ${locale?.languageTag}, ${locale?.measurementSystem}`,
-              `background task: ${BackgroundTask.BackgroundTaskStatus[bg]}`,
-            ].join('\n');
-          })}
-        />
-      </Row>
-    </ScrollView>
+        <Row title="System" status={s('system')}>
+          <Btn
+            label="Read"
+            onPress={run('system', async () => {
+              const net = await NetInfo.fetch();
+              const locale = getLocales()[0];
+              const bg = await BackgroundTask.getStatusAsync();
+              return [
+                `net: ${net.type}, connected ${net.isConnected}`,
+                `locale: ${locale?.languageTag}, ${locale?.measurementSystem}`,
+                `background task: ${BackgroundTask.BackgroundTaskStatus[bg]}`,
+              ].join('\n');
+            })}
+          />
+        </Row>
+      </ScrollView>
+    </ThemedScreen>
   );
 }
 
