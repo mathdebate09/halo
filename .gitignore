@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# env
+.env
+.env*.local
+
+# OS / editor
+.DS_Store
+*.log
+
+# Claude Code local settings (project skills stay committed)
+.claude/settings.local.json
+
+# third-party screenshots (public repo; see SPEC.md)
+references/oura/
+references/lifesum/
+references/nutrie-summary.png
+
+# app: generated native folders and build output (rules also live in halo-app/.gitignore)
+halo-app/android/
+halo-app/ios/
+halo-app/.expo/
+halo-app/dist/
+
+# backend build output
+halo-backend/dist/
+halo-backend/coverage/
