@@ -7,6 +7,7 @@ export * from './learning.js';
 export * from './loop.js';
 export * from './meals.js';
 export * from './pa.js';
+export * from './phrase.js';
 export * from './plan.js';
 export * from './scoring.js';
 export * from './signals.js';

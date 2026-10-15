@@ -5,6 +5,7 @@ export * from './learning';
 export * from './loop';
 export * from './meals';
 export * from './pa';
+export * from './phrase';
 export * from './plan';
 export * from './scoring';
 export * from './signals';

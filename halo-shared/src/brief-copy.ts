@@ -1,8 +1,12 @@
 // Template wording for each brief: a short tagline, one line, and the action's label. These are
 // what Today shows instantly and what any rephrasing falls back to. Plain words, real numbers,
 // no exclamation marks: written the way a good assistant texts, not the way an app talks.
+//
+// Numbers and times are never baked into the words. A template is first rendered as a pattern
+// ("About {gap} g short for {at}.") and then filled from the facts, so a reworded pattern can be
+// cached while the numbers stay live and match every other place they're shown.
 
-import type { InsightCopy, Signal } from './signals';
+import type { InsightCopy, InsightFacts, Signal } from './signals';
 
 const MEAL_NAMES: Record<string, string> = {
   breakfast: 'breakfast',
@@ -60,7 +64,7 @@ const COPY: Record<Signal['type'], (s: Signal) => InsightCopy> = {
   water_pace: ({ facts: f }) => ({
     tagline: 'Water break',
     line: `About ${f.gap} ml behind for ${f.at}. A glass now helps.`,
-    actionLabel: 'Add 250 ml',
+    actionLabel: 'Add a glass',
   }),
   weigh_in: () => ({
     tagline: 'Morning weigh-in',
@@ -86,4 +90,38 @@ const COPY: Record<Signal['type'], (s: Signal) => InsightCopy> = {
   }),
 };
 
-export const briefCopy = (signal: Signal): InsightCopy => COPY[signal.type](signal);
+/** A fact the words show as a live value: any non-zero number, or text with a digit (a time). */
+const isLive = (value: number | string) =>
+  typeof value === 'number' ? value !== 0 : /\d/.test(value);
+
+/** The brief's words with each live value as a `{name}` placeholder. */
+export function briefPattern(signal: Signal): InsightCopy {
+  const masked: InsightFacts = {};
+  for (const [key, value] of Object.entries(signal.facts)) {
+    masked[key] = isLive(value) ? `{${key}}` : value;
+  }
+  return COPY[signal.type]({ ...signal, facts: masked });
+}
+
+/** The placeholders a piece of text uses, e.g. ["gap", "at"]. */
+export const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!);
+
+const fillText = (text: string, facts: InsightFacts) =>
+  text.replace(/\{(\w+)\}/g, (whole, key: string) => {
+    const value = facts[key];
+    if (value == null) return whole;
+    // Same number format as Learn more's figures ("1,250").
+    return typeof value === 'number' ? value.toLocaleString('en-GB') : value;
+  });
+
+/** Fills a pattern's placeholders from the facts. */
+export function fillPattern(pattern: InsightCopy, facts: InsightFacts): InsightCopy {
+  return {
+    tagline: fillText(pattern.tagline, facts),
+    line: fillText(pattern.line, facts),
+    actionLabel: pattern.actionLabel == null ? null : fillText(pattern.actionLabel, facts),
+  };
+}
+
+export const briefCopy = (signal: Signal): InsightCopy =>
+  fillPattern(briefPattern(signal), signal.facts);

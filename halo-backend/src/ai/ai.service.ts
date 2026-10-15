@@ -19,6 +19,8 @@ export type JsonRequest<T extends z.ZodType> = {
   maxTokens: number;
   /** Overrides AI_TIMEOUT_MS for this call (per attempt). */
   timeoutMs?: number;
+  /** Defaults to 0.2 (estimates); higher where varied wording is the point. */
+  temperature?: number;
 };
 
 /** The AI couldn't produce a valid answer (not configured, down, timed out or invalid twice). */
@@ -69,7 +71,7 @@ export class AiService {
     throw new AiUnavailableError(last);
   }
 
-  private async complete({ messages, maxTokens, timeoutMs }: JsonRequest<z.ZodType>): Promise<string> {
+  private async complete({ messages, maxTokens, timeoutMs, temperature }: JsonRequest<z.ZodType>): Promise<string> {
     let response: Response;
     try {
       response = await fetch(`${this.env.DEEPSEEK_BASE_URL}/chat/completions`, {
@@ -86,7 +88,7 @@ export class AiService {
           // Estimates are as good without it (measured: ~1.3 s vs ~10 s at "low").
           reasoning_effort: 'none',
           max_tokens: maxTokens,
-          temperature: 0.2,
+          temperature: temperature ?? 0.2,
         }),
         signal: AbortSignal.timeout(timeoutMs ?? this.env.AI_TIMEOUT_MS),
       });

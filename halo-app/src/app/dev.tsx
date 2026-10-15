@@ -228,6 +228,7 @@ function AssistantRow() {
       `set aside: ${t.dropped.join('; ') || 'none'}`,
       `ranked: ${t.ranked.join(', ') || 'none'}${t.held ? ' · held' : ''}`,
       `brief: ${t.brief.tagline} / ${t.brief.line}${t.brief.lead ? ` / lead: ${t.brief.lead}` : ''}`,
+      `words: ${t.phrase}`,
     ];
   }
   return <Row title="Assistant (PA trace)" status={lines.join('\n')} />;

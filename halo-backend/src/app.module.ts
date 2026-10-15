@@ -9,6 +9,7 @@ import { DeviceThrottlerGuard } from './device/device-throttler.guard.js';
 import { DeviceGuard } from './device/device.guard.js';
 import { DeviceModule } from './device/device.module.js';
 import { HealthController } from './health/health.controller.js';
+import { InsightsModule } from './insights/insights.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
 import { LegalController } from './legal/legal.controller.js';
 import { MealsModule } from './meals/meals.module.js';
@@ -30,6 +31,7 @@ export class AppModule {
         SyncModule,
         JobsModule,
         MealsModule,
+        InsightsModule,
       ],
       controllers: [HealthController, LegalController],
       providers: [

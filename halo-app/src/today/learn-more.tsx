@@ -14,6 +14,7 @@ import {
 } from '@/components/icons';
 import { useAssistant } from '@/assistant/assistant';
 import { markActed } from '@/assistant/loop-store';
+import { useBriefWords } from '@/assistant/phrasing';
 import { PressScale } from '@/components/press-scale';
 import { showToast } from '@/components/toast';
 import { connectHealthConnect, refreshHealthData } from '@/lib/health-connect';
@@ -46,7 +47,9 @@ const ICONS: Partial<Record<SummaryTab, ComponentType<{ size?: number; color: st
 export function LearnMore({ scores, armed }: { scores: TodayScores; armed: boolean }) {
   const { theme } = useHaloTheme();
   const { width } = useWindowDimensions();
-  const { insight } = useAssistant().brief;
+  const { brief, phrase } = useAssistant();
+  const { insight } = brief;
+  const words = useBriefWords(brief, phrase);
   // Opens on the brief's chip (the meal score when it has none). A chip the user picks holds
   // until they leave Today, so a new brief never moves the panel under them.
   const opening = insight.tab && ICONS[insight.tab] ? insight.tab : 'meal';
@@ -61,8 +64,8 @@ export function LearnMore({ scores, armed }: { scores: TodayScores; armed: boole
   const panel = summaryPanel(tab, facts);
   // On the brief's own chip, Next is the step the PA prepared.
   const next =
-    insight.tab === tab && insight.action && insight.copy.actionLabel
-      ? { text: insight.copy.actionLabel, action: insight.action, briefId: insight.id }
+    insight.tab === tab && insight.action && words.actionLabel
+      ? { text: words.actionLabel, action: insight.action, briefId: insight.id }
       : panel.nudge && panel.next.action
         ? { ...panel.next, briefId: null }
         : null;

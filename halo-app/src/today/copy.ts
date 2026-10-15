@@ -2,12 +2,11 @@
 // on track (or still an early read) the tier's own line does, picked by day, tier and time of day
 // so the words stay put between renders.
 
-import type { Brief, Tier } from '@/shared';
+import { type Brief, type DaySlot, type InsightCopy, slotFor, type Tier } from '@/shared';
 
-type Slot = 'morning' | 'afternoon' | 'evening' | 'night';
 type Copy = { tagline: string; body: string };
 
-const TEMPLATES: Record<Tier, Record<Slot, Copy[]>> = {
+const TEMPLATES: Record<Tier, Record<DaySlot, Copy[]>> = {
   high: {
     morning: [
       {
@@ -140,11 +139,6 @@ const PROVISIONAL_BODY =
   'Go about your day. Your score sharpens as meals, water and steps come in.';
 const PROVISIONAL_NIGHT = 'Rest up. Tomorrow’s score builds as meals, water and steps come in.';
 
-// Late night (from 22:00 until 05:00) is still the previous day under the 4 am rollover: no
-// breakfast advice at 2 am.
-const slotFor = (hour: number): Slot =>
-  hour < 5 || hour >= 22 ? 'night' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-
 function hash(text: string) {
   let h = 0;
   for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
@@ -159,10 +153,12 @@ export function todayCopy(tier: Tier, day: string, hour: number, provisional: bo
   return { tagline: pick.tagline, body: slot === 'night' ? PROVISIONAL_NIGHT : PROVISIONAL_BODY };
 }
 
-/** What the hero says: the brief (led by yesterday's outcome in the morning), or the tier's line. */
-export function briefCopy(brief: Brief, tier: Copy): Copy {
+/**
+ * What the hero says: the brief in its words (led by yesterday's outcome in the morning), or the
+ * tier's line when the day is on track.
+ */
+export function briefCopy(brief: Brief, words: InsightCopy, tier: Copy): Copy {
   const { insight, lead } = brief;
   if (insight.type === 'on_track') return lead ? { tagline: tier.tagline, body: lead } : tier;
-  const body = lead ? `${lead} ${insight.copy.line}` : insight.copy.line;
-  return { tagline: insight.copy.tagline, body };
+  return { tagline: words.tagline, body: lead ? `${lead} ${words.line}` : words.line };
 }

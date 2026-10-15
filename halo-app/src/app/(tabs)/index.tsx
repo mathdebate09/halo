@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAssistant } from '@/assistant/assistant';
 import { recordShown } from '@/assistant/loop-store';
+import { useBriefWords } from '@/assistant/phrasing';
 import { useDockInset } from '@/components/dock';
 import { HeroBackdrop } from '@/components/hero-backdrop';
 import { DietIcon, ExerciseIcon, ShareIcon, VitalsIcon } from '@/components/icons';
@@ -58,10 +59,11 @@ export default function TodayScreen() {
   const scores = useTodayScores();
   const focused = useIsFocused();
   const glow = useMealCelebration(scores, focused);
-  const { brief } = useAssistant();
+  const { brief, phrase } = useAssistant();
+  const words = useBriefWords(brief, phrase);
   // The tier's own words (the share card keeps these); the hero says what the PA brings.
   const tierCopy = todayCopy(target.tier, scores.day, hourOfDay(scores.now), scores.provisional);
-  const copy = briefCopy(brief, tierCopy);
+  const copy = briefCopy(brief, words, tierCopy);
   const briefId = brief.insight.id;
   useEffect(() => {
     if (focused) recordShown(brief.insight, scores.day, 'today');

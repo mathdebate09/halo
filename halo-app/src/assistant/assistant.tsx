@@ -20,18 +20,25 @@ import {
   transitions,
   weighInDue,
 } from '@/shared';
+import { useHaloTheme } from '@/theme/theme-provider';
 import { useTodayScores } from '@/today/today-scores';
 
 import { useDailyScoreWriter } from './daily-score';
 import { isWeekend, noteAppOpen, refreshLearned, useLearned, windowsOn } from './learned';
 import { applyTransitions, useInsightHistory } from './loop-store';
+import { phraseItemFor, readPhrase, requestPhrases } from './phrasing';
 
 /** The brief on screen, kept across renders and restarts so it doesn't flip (PA hold). */
 const HELD_KEY = 'assistant.held';
 /** The latest PA trace, for the dev screen. */
 export const TRACE_KEY = 'assistant.trace';
 
-export type Assistant = { brief: Brief; context: PaContext };
+export type Assistant = {
+  brief: Brief;
+  context: PaContext;
+  /** Cache key of the brief's reworded words (null when the tier's lines speak). */
+  phrase: string | null;
+};
 
 const AssistantContext = createContext<Assistant | null>(null);
 
@@ -41,6 +48,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const scores = useTodayScores();
   const { day, now, facts } = scores;
   const learned = useLearned();
+  const { target } = useHaloTheme();
   useDailyScoreWriter(scores);
 
   // Learn on launch, on every return to the foreground, and when meals come in.
@@ -123,6 +131,14 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     if (kv.getString(HELD_KEY) !== briefId) kv.set(HELD_KEY, briefId);
   }, [briefId]);
 
+  // Pre-compute the brief's words in the background whenever its situation changes.
+  const phraseItem = phraseItemFor(result, target.tier, context.hour, facts.goal);
+  const phrase = phraseItem?.key ?? null;
+  useEffect(() => {
+    if (phraseItem) requestPhrases([phraseItem]);
+    // Keyed on the phrase key: the item is rebuilt every render.
+  }, [phrase]);
+
   // Close the loop: gaps that closed resolve, untouched briefs past their time are ignored.
   const pending = transitions(records, context);
   const pendingKey = pending.map((t) => `${t.id}>${t.state}`).join('|');
@@ -146,12 +162,13 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     ranked: result.trace.ranked.map((r) => `${r.type} ${r.score}${r.note ? ` (${r.note})` : ''}`),
     held: result.trace.held,
     brief: { ...result.insight.copy, lead: result.lead },
+    phrase: phrase ? `${phrase} ${readPhrase(phrase) ? 'reworded' : 'template'}` : 'tier lines',
   });
   useEffect(() => {
     if (kv.getString(TRACE_KEY) !== trace) kv.set(TRACE_KEY, trace);
   }, [trace]);
 
-  return <AssistantContext value={{ brief: result, context }}>{children}</AssistantContext>;
+  return <AssistantContext value={{ brief: result, context, phrase }}>{children}</AssistantContext>;
 }
 
 export function useAssistant() {
