@@ -125,6 +125,12 @@ export const insights = sqliteTable(
     expiresAt: integer('expires_at'),
     state: text('state').$type<InsightState>().notNull().default('pending'),
     segments: text('segments', { mode: 'json' }), // AI phrasing as structured segments
+    /** Where it first reached the user. */
+    channel: text('channel').$type<'today' | 'learn' | 'notification'>(),
+    shownAt: integer('shown_at'),
+    actedAt: integer('acted_at'),
+    resolvedAt: integer('resolved_at'),
+    notificationId: text('notification_id'),
   },
   (t) => [index('insights_day').on(t.day)],
 );

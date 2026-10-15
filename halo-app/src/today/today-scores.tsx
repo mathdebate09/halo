@@ -7,6 +7,7 @@ import { createContext, type ReactNode, use, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { useMMKVNumber } from 'react-native-mmkv';
 
+import { useLearned, windowsOn } from '@/assistant/learned';
 import { db } from '@/db/client';
 import { hcDaily, meals, water } from '@/db/schema';
 import { refreshHealthData } from '@/lib/health-connect';
@@ -44,6 +45,8 @@ export type TodayScores = {
   vitals: Score;
   /** 0-100, always present. */
   overall: number;
+  /** 0-100 once water has ever been logged, otherwise null (not rated yet). */
+  water: number | null;
   /** Fewer than two components backed by real data: shown, but never moves the tier. */
   provisional: boolean;
   /** Today's logged intake against where it should be by now (meal reactions). */
@@ -95,6 +98,8 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
   const profile = useProfile();
   const { setThemeId } = useHaloTheme();
   const [override] = useMMKVNumber(DEV_SCORE_OVERRIDE_KEY, kv);
+  // The user's own meal times (weekday or weekend) once learned, else the defaults.
+  const windows = windowsOn(day, useLearned());
 
   const { data: mealRows } = useLiveQuery(
     db
@@ -135,7 +140,7 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
   const targetKcal = plan?.targetKcal ?? 2000;
   const targetProteinG = plan?.proteinG ?? 100;
   // Once a meal is in, "by now" is at least a breakfast's share (matches dietScore's floor).
-  const due = Math.max(expectedIntakeFraction(hour), mealRows.length ? 0.25 : 0);
+  const due = Math.max(expectedIntakeFraction(hour, windows), mealRows.length ? 0.25 : 0);
 
   const diet = dietScore({
     meals: mealRows.map((m) => ({
@@ -153,6 +158,7 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
       fatG: plan?.fatG ?? 65,
     },
     hour,
+    windows,
   });
 
   const todayRow = hcRows.find((r) => r.day === day);
@@ -206,6 +212,7 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
     activity,
     vitals,
     overall,
+    water: waterValue,
     provisional: rated == null,
     facts: {
       hour,

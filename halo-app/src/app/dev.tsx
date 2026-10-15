@@ -35,6 +35,7 @@ import { router } from 'expo-router';
 import { and, count, desc, eq, isNull, sum } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 
+import { TRACE_KEY } from '@/assistant/assistant';
 import { HeroBackdrop } from '@/components/hero-backdrop';
 import { ThemedScreen } from '@/components/themed-screen';
 import { useHaloTheme } from '@/theme/theme-provider';
@@ -212,6 +213,26 @@ function TodayRow() {
   );
 }
 
+/** Read-only: what the PA saw, set aside and ranked, and the brief it chose (latest Today pass). */
+function AssistantRow() {
+  const [raw] = useMMKVString(TRACE_KEY, kv);
+  let lines: string[] = ['No trace yet: open Today first.'];
+  if (raw) {
+    const t = JSON.parse(raw);
+    lines = [
+      `at ${t.at} · wake ${t.wake.value.toFixed(2)} (${t.wake.source}) · bed ${t.bedtime.hour.toFixed(2)}${t.bedtime.pulled ? ' pulled' : ''}`,
+      `windows B ${t.windows.breakfast.start}-${t.windows.breakfast.end} L ${t.windows.lunch.start}-${t.windows.lunch.end} D ${t.windows.dinner.start}-${t.windows.dinner.end}`,
+      `usual ${JSON.stringify(t.usualMeals)} · weigh due ${t.weighDue}`,
+      `stored today: ${t.stored.join(', ') || 'none'}`,
+      `signals: ${t.signals.join(', ') || 'none'}`,
+      `set aside: ${t.dropped.join('; ') || 'none'}`,
+      `ranked: ${t.ranked.join(', ') || 'none'}${t.held ? ' · held' : ''}`,
+      `brief: ${t.brief.tagline} / ${t.brief.line}${t.brief.lead ? ` / lead: ${t.brief.lead}` : ''}`,
+    ];
+  }
+  return <Row title="Assistant (PA trace)" status={lines.join('\n')} />;
+}
+
 function ThemesRow() {
   const { theme, target, setThemeId } = useHaloTheme();
   const [preview, setPreview] = useState(false);
@@ -316,6 +337,7 @@ export default function DevScreen() {
         <OnboardingRow />
         <ThemesRow />
         <TodayRow />
+        <AssistantRow />
         <StoreRow />
         <SyncRow />
 

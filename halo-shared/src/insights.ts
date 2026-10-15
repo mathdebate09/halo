@@ -36,6 +36,7 @@ export type NextAction =
   | { kind: 'water'; ml: number }
   | { kind: 'log'; note: string }
   | { kind: 'connect' }
+  | { kind: 'weigh' }
   | null;
 
 export type Panel = {
@@ -77,11 +78,18 @@ export type DayFacts = {
 };
 
 /** Below this share of the day there's no pace to speak of yet. */
-const EARLY = 0.08;
-const ON_PACE = 0.1;
+export const EARLY = 0.08;
+export const ON_PACE = 0.1;
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-GB');
 const grams = (n: number) => `${fmt(n)} g`;
+
+/** Gaps read as people say them, and the same everywhere a gap is shown (brief and panel). */
+export const GAP_STEP: Record<string, number> = { kcal: 10, g: 5, ml: 50, steps: 100 };
+export const roundGap = (n: number, unit: string) => {
+  const step = GAP_STEP[unit] ?? 1;
+  return Math.max(step, Math.round(n / step) * step);
+};
 
 /** The hour, not the minute: text that changes every minute would replay its reveal. */
 function clock(hour: number) {
@@ -93,7 +101,7 @@ function paceLine(actual: number, target: number, share: number, unit: string, h
   if (share < EARLY) return 'Too early to judge. The day has barely started.';
   const expected = target * share;
   const diff = actual - expected;
-  const show = unit === 'kcal' ? `${fmt(Math.abs(diff))} kcal` : `${fmt(Math.abs(diff))} ${unit}`;
+  const show = `${fmt(roundGap(Math.abs(diff), unit))} ${unit}`;
   if (Math.abs(diff) <= expected * ON_PACE) return `Right on pace for ${clock(hour)}.`;
   return diff < 0
     ? `About ${show} behind where you'd usually be by ${clock(hour)}.`
@@ -104,7 +112,7 @@ function paceLine(actual: number, target: number, share: number, unit: string, h
  * The meal to suggest next: the first main meal not yet logged whose window (with an hour's
  * grace) hasn't closed, otherwise a snack.
  */
-function nextMeal(hour: number, logged: readonly MealType[]): MealType {
+export function nextMeal(hour: number, logged: readonly MealType[]): MealType {
   for (const type of ['breakfast', 'lunch', 'dinner'] as const) {
     if (logged.includes(type)) continue;
     if (hour <= DEFAULT_MEAL_WINDOWS[type].end + 1) return type;
@@ -113,7 +121,7 @@ function nextMeal(hour: number, logged: readonly MealType[]): MealType {
 }
 
 /** Pre-filled logger notes, with the words the Next button uses for each. */
-const SUGGESTIONS = {
+export const SUGGESTIONS = {
   protein: { note: 'Greek yogurt with berries', label: 'Log Greek yogurt with berries' },
   carbs: { note: 'Oats with banana', label: 'Log oats with banana' },
   fat: { note: 'A handful of almonds', label: 'Log a handful of almonds' },
@@ -124,7 +132,7 @@ const SUGGESTIONS = {
   snack: { note: 'An apple with peanut butter', label: 'Log a snack' },
 } as const;
 
-const behind = (actual: number, target: number, due: number) =>
+export const behind = (actual: number, target: number, due: number) =>
   due >= EARLY && actual < target * due * (1 - ON_PACE);
 
 function macroNext(f: DayFacts, key: 'proteinG' | 'carbsG' | 'fatG'): Panel['next'] {

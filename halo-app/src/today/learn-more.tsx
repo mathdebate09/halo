@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { type ComponentType, type ReactNode, useState } from 'react';
+import { router, useIsFocused } from 'expo-router';
+import { type ComponentType, type ReactNode, useEffect, useState } from 'react';
 import { Text, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, FadeIn } from 'react-native-reanimated';
 
@@ -12,6 +12,8 @@ import {
   SummaryIcon,
   WaterDropIcon,
 } from '@/components/icons';
+import { useAssistant } from '@/assistant/assistant';
+import { markActed } from '@/assistant/loop-store';
 import { PressScale } from '@/components/press-scale';
 import { showToast } from '@/components/toast';
 import { connectHealthConnect, refreshHealthData } from '@/lib/health-connect';
@@ -44,9 +46,26 @@ const ICONS: Partial<Record<SummaryTab, ComponentType<{ size?: number; color: st
 export function LearnMore({ scores, armed }: { scores: TodayScores; armed: boolean }) {
   const { theme } = useHaloTheme();
   const { width } = useWindowDimensions();
-  const [tab, setTab] = useState<SummaryTab>('meal');
+  const { insight } = useAssistant().brief;
+  // Opens on the brief's chip (the meal score when it has none). A chip the user picks holds
+  // until they leave Today, so a new brief never moves the panel under them.
+  const opening = insight.tab && ICONS[insight.tab] ? insight.tab : 'meal';
+  const [picked, setPicked] = useState<SummaryTab | null>(null);
+  const focused = useIsFocused();
+  useEffect(() => {
+    if (!focused) setPicked(null);
+  }, [focused]);
+  const tab = picked ?? opening;
+  const setTab = setPicked;
   const facts = scores.facts;
   const panel = summaryPanel(tab, facts);
+  // On the brief's own chip, Next is the step the PA prepared.
+  const next =
+    insight.tab === tab && insight.action && insight.copy.actionLabel
+      ? { text: insight.copy.actionLabel, action: insight.action, briefId: insight.id }
+      : panel.nudge && panel.next.action
+        ? { ...panel.next, briefId: null }
+        : null;
   const visual = tab === 'water' ? 'water' : 'wheel';
   const Icon = ICONS[tab] ?? MealScoreIcon;
 
@@ -92,16 +111,19 @@ export function LearnMore({ scores, armed }: { scores: TodayScores; armed: boole
         <View className="mt-4">
           <RevealText key={tab} segments={[{ t: panel.pace }]} armed={armed} center />
         </View>
-        {panel.nudge && panel.next.action ? (
+        {next ? (
           <Animated.View
-            key={`next:${tab}`}
+            key={`next:${tab}:${next.text}`}
             entering={FadeIn.duration(300).delay(250)}
             className="mt-4 items-center">
             <PressScale
               accessibilityRole="button"
-              onPress={() => runNext(panel.next.action)}
+              onPress={() => {
+                if (next.briefId) markActed(next.briefId);
+                runNext(next.action);
+              }}
               className="rounded-pill bg-glass/10 px-5 py-2.5 active:bg-glass/20">
-              <Text className="font-sans-medium text-[15px] text-text">{panel.next.text}</Text>
+              <Text className="font-sans-medium text-[15px] text-text">{next.text}</Text>
             </PressScale>
           </Animated.View>
         ) : null}
@@ -125,7 +147,10 @@ function Label({ icon, text }: { icon: ReactNode; text: string }) {
   );
 }
 
-/** Next acts where it can (water), pre-fills the logger for food, and connects missing sources. */
+/**
+ * Next acts where it can (water), pre-fills the logger for food, opens the weigh-in sheet at the
+ * last weight, and connects missing sources.
+ */
 async function runNext(action: NextAction) {
   if (!action) return;
   if (action.kind === 'water') {
@@ -133,6 +158,8 @@ async function runNext(action: NextAction) {
     showToast(`${action.ml} ml water added`);
   } else if (action.kind === 'log') {
     router.navigate({ pathname: '/log', params: { note: action.note } });
+  } else if (action.kind === 'weigh') {
+    router.push('/weigh-in');
   } else {
     await connectHealthConnect();
     refreshHealthData(true);

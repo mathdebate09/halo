@@ -4,6 +4,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
+import { windowsOn } from '@/assistant/learned';
 import { upsertRecord } from '@/db/mutate';
 import { dayKey, hourOfDay, mealTypeAt } from '@/shared';
 
@@ -48,7 +49,7 @@ export function saveMeal({
   const id = upsertRecord('meal', {
     day: dayKey(now),
     eatenAt: now.getTime(),
-    mealType: mealTypeAt(hourOfDay(now)),
+    mealType: mealTypeAt(hourOfDay(now), windowsOn(dayKey(now))),
     source: kept ? 'photo' : 'text',
     note: note?.trim() || null,
     photoUri: kept,

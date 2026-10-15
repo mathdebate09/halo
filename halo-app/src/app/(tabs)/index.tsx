@@ -15,6 +15,8 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useAssistant } from '@/assistant/assistant';
+import { recordShown } from '@/assistant/loop-store';
 import { useDockInset } from '@/components/dock';
 import { HeroBackdrop } from '@/components/hero-backdrop';
 import { DietIcon, ExerciseIcon, ShareIcon, VitalsIcon } from '@/components/icons';
@@ -29,7 +31,7 @@ import { PendingMealCard } from '@/meals/pending-meal-card';
 import { hourOfDay } from '@/shared';
 import { motion } from '@/theme/motion';
 import { useHaloTheme } from '@/theme/theme-provider';
-import { todayCopy } from '@/today/copy';
+import { briefCopy, todayCopy } from '@/today/copy';
 import { prefetchHeroes } from '@/today/prefetch';
 import { useMealCelebration } from '@/today/celebration';
 import { LearnMore } from '@/today/learn-more';
@@ -56,7 +58,15 @@ export default function TodayScreen() {
   const scores = useTodayScores();
   const focused = useIsFocused();
   const glow = useMealCelebration(scores, focused);
-  const copy = todayCopy(target.tier, scores.day, hourOfDay(scores.now), scores.provisional);
+  const { brief } = useAssistant();
+  // The tier's own words (the share card keeps these); the hero says what the PA brings.
+  const tierCopy = todayCopy(target.tier, scores.day, hourOfDay(scores.now), scores.provisional);
+  const copy = briefCopy(brief, tierCopy);
+  const briefId = brief.insight.id;
+  useEffect(() => {
+    if (focused) recordShown(brief.insight, scores.day, 'today');
+    // The brief object is new every render; its id is what matters.
+  }, [briefId, focused]);
   const { width, height } = size;
   const dockInset = useDockInset();
   const scroll = useRef<Animated.ScrollView>(null);
@@ -118,7 +128,7 @@ export default function TodayScreen() {
               accessibilityRole="button"
               accessibilityLabel="Share"
               onPress={() => {
-                setShareSnapshot(scores, copy.tagline, theme);
+                setShareSnapshot(scores, tierCopy.tagline, theme);
                 router.push('/share');
               }}
               hitSlop={8}

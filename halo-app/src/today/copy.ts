@@ -1,7 +1,8 @@
-// Template tagline + description for the Today hero, until AI phrasing arrives (chunk 16). Picked
-// by day, tier and time of day so the words stay put between renders.
+// The Today hero's words. The PA's brief speaks when something needs the user; when the day is
+// on track (or still an early read) the tier's own line does, picked by day, tier and time of day
+// so the words stay put between renders.
 
-import type { Tier } from '@/shared';
+import type { Brief, Tier } from '@/shared';
 
 type Slot = 'morning' | 'afternoon' | 'evening' | 'night';
 type Copy = { tagline: string; body: string };
@@ -156,4 +157,12 @@ export function todayCopy(tier: Tier, day: string, hour: number, provisional: bo
   const pick = options[hash(`${day}:${tier}:${slot}`) % options.length]!;
   if (!provisional) return pick;
   return { tagline: pick.tagline, body: slot === 'night' ? PROVISIONAL_NIGHT : PROVISIONAL_BODY };
+}
+
+/** What the hero says: the brief (led by yesterday's outcome in the morning), or the tier's line. */
+export function briefCopy(brief: Brief, tier: Copy): Copy {
+  const { insight, lead } = brief;
+  if (insight.type === 'on_track') return lead ? { tagline: tier.tagline, body: lead } : tier;
+  const body = lead ? `${lead} ${insight.copy.line}` : insight.copy.line;
+  return { tagline: insight.copy.tagline, body };
 }
