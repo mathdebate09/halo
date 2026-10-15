@@ -2,6 +2,7 @@
 
 export * from './brief-copy';
 export * from './day';
+export * from './exercise';
 export * from './insights';
 export * from './learning';
 export * from './loop';
