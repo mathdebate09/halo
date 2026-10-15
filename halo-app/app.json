@@ -61,7 +61,12 @@
             "./node_modules/@expo-google-fonts/inclusive-sans/400Regular/InclusiveSans_400Regular.ttf",
             "./node_modules/@expo-google-fonts/inclusive-sans/500Medium/InclusiveSans_500Medium.ttf",
             "./node_modules/@expo-google-fonts/instrument-serif/400Regular/InstrumentSerif_400Regular.ttf",
-            "./node_modules/@expo-google-fonts/instrument-serif/400Regular_Italic/InstrumentSerif_400Regular_Italic.ttf"
+            "./node_modules/@expo-google-fonts/instrument-serif/400Regular_Italic/InstrumentSerif_400Regular_Italic.ttf",
+            "./node_modules/@expo-google-fonts/anton/400Regular/Anton_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/space-mono/400Regular/SpaceMono_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/space-mono/700Bold/SpaceMono_700Bold.ttf",
+            "./node_modules/@expo-google-fonts/caveat/600SemiBold/Caveat_600SemiBold.ttf",
+            "./node_modules/@expo-google-fonts/vt323/400Regular/VT323_400Regular.ttf"
           ]
         }
       ],
@@ -98,14 +103,6 @@
       ],
       "expo-sharing",
       "expo-background-task",
-      [
-        "expo-speech-recognition",
-        {
-          "microphonePermission": "Halo listens when you describe a meal out loud.",
-          "speechRecognitionPermission": "Halo turns what you say into a meal log.",
-          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
-        }
-      ],
       "expo-localization",
       "react-native-health-connect",
       [

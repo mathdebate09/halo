@@ -35,6 +35,12 @@ module.exports = {
         'sans-medium': ['InclusiveSans_500Medium'],
         serif: ['InstrumentSerif_400Regular'],
         'serif-italic': ['InstrumentSerif_400Regular_Italic'],
+        // Share stickers only (chunk 15).
+        anton: ['Anton_400Regular'],
+        mono: ['SpaceMono_400Regular'],
+        'mono-bold': ['SpaceMono_700Bold'],
+        hand: ['Caveat_600SemiBold'],
+        led: ['VT323_400Regular'],
       },
       borderRadius: {
         card: '28px',

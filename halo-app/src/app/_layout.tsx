@@ -47,6 +47,7 @@ function RootNavigator() {
             }}
           />
           <Stack.Screen name="advisor" />
+          <Stack.Screen name="share" options={{ animation: 'slide_from_bottom' }} />
         </Stack.Protected>
         <Stack.Protected guard={!onboarded}>
           <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />

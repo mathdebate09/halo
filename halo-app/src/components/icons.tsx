@@ -244,3 +244,57 @@ export function WaterDropIcon(props: IconProps) {
     </Line>
   );
 }
+
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M5.5 9.5 12 16l6.5-6.5" />
+    </Line>
+  );
+}
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M4.5 6.5h15M9.5 6.5V4.8A1.3 1.3 0 0 1 10.8 3.5h2.4a1.3 1.3 0 0 1 1.3 1.3v1.7M6.5 6.5l.9 12.6a1.5 1.5 0 0 0 1.5 1.4h6.2a1.5 1.5 0 0 0 1.5-1.4l.9-12.6M10 10.5v6M14 10.5v6" />
+    </Line>
+  );
+}
+
+export function DownloadIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M12 3.5V15M7 10.5l5 4.5 5-4.5M5 20h14" />
+    </Line>
+  );
+}
+
+/** Instagram's camera glyph: a rounded square, a lens and the flash dot. */
+export function InstagramIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M8 3.5h8A4.5 4.5 0 0 1 20.5 8v8a4.5 4.5 0 0 1-4.5 4.5H8A4.5 4.5 0 0 1 3.5 16V8A4.5 4.5 0 0 1 8 3.5z" />
+      <Circle cx={12} cy={12} r={3.8} />
+      <Circle cx={17} cy={7} r={0.6} fill={props.color} />
+    </Line>
+  );
+}
+
+export function EyeIcon({ off = false, ...props }: IconProps & { off?: boolean }) {
+  return (
+    <Line {...props}>
+      <Path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+      <Circle cx={12} cy={12} r={3} />
+      {off ? <Path d="M4 4l16 16" /> : null}
+    </Line>
+  );
+}
+
+export function CameraIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M4.5 7.5h3l1.5-2.5h6l1.5 2.5h3A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5V9a1.5 1.5 0 0 1 1.5-1.5z" />
+      <Circle cx={12} cy={13.5} r={3.8} />
+    </Line>
+  );
+}

@@ -11,7 +11,6 @@ import { getLocales } from 'expo-localization';
 import { Asset, requestPermissionsAsync as requestMediaPermissions } from 'expo-media-library';
 import * as Notifications from 'expo-notifications';
 import * as Sharing from 'expo-sharing';
-import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { type ReactNode, useRef, useState } from 'react';
 import {
   Modal,
@@ -293,13 +292,9 @@ export default function DevScreen() {
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [showCamera, setShowCamera] = useState(false);
   const [pdfPage, setPdfPage] = useState<string | null>(null);
-  const [transcript, setTranscript] = useState('');
   const shotRef = useRef<View>(null);
   const blurTargetRef = useRef<View>(null);
   const lastCapture = useRef<string | null>(null);
-
-  useSpeechRecognitionEvent('result', (e) => setTranscript(e.results[0]?.transcript ?? ''));
-  useSpeechRecognitionEvent('error', (e) => set('speech', `✕ ${e.error}: ${e.message}`));
 
   const run = (key: string, fn: () => Promise<string>) => async () => {
     set(key, '…');
@@ -522,25 +517,6 @@ export default function DevScreen() {
               return `${res.COUNT_TOTAL} steps (${res.dataOrigins.join(', ') || 'no sources'})`;
             })}
           />
-        </Row>
-
-        <Row title="Speech recognition" status={transcript || s('speech')}>
-          <Btn
-            label="Listen"
-            onPress={run('speech', async () => {
-              if (!ExpoSpeechRecognitionModule.isRecognitionAvailable())
-                return 'not available on this device';
-              const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-              if (!perm.granted) return 'permission denied';
-              setTranscript('');
-              ExpoSpeechRecognitionModule.start({
-                lang: 'en-US',
-                interimResults: true,
-              });
-              return 'listening…';
-            })}
-          />
-          <Btn label="Stop" onPress={() => ExpoSpeechRecognitionModule.stop()} />
         </Row>
 
         <Row title="System" status={s('system')}>

@@ -24,6 +24,7 @@ import { ScoreArc, ScoreScrim } from '@/components/score-arc';
 import { ScoreChip } from '@/components/score-chip';
 import { ThemedScreen } from '@/components/themed-screen';
 import { refreshHealthData } from '@/lib/health-connect';
+import { setShareSnapshot } from '@/share/snapshot';
 import { PendingMealCard } from '@/meals/pending-meal-card';
 import { hourOfDay } from '@/shared';
 import { motion } from '@/theme/motion';
@@ -113,10 +114,13 @@ export default function TodayScreen() {
             <Pressable onLongPress={() => router.push('/dev')} delayLongPress={600} hitSlop={12}>
               <Text className="font-wordmark text-[28px] text-text">Halo</Text>
             </Pressable>
-            {/* The share composer arrives in chunk 15. */}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Share"
+              onPress={() => {
+                setShareSnapshot(scores, copy.tagline, theme);
+                router.push('/share');
+              }}
               hitSlop={8}
               className="h-11 w-11 items-center justify-center rounded-full active:bg-glass/10">
               <ShareIcon size={24} color={theme.colors.text} />
