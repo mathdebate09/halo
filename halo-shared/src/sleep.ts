@@ -2,7 +2,7 @@
 // A night is the longest overnight stretch of screen-off time, with short checks of the phone
 // folded in. It is an estimate (the screen goes dark before sleep comes), labelled as such.
 
-import { dayKey } from './day';
+import { dayHour, dayKey } from './day';
 import { median } from './learning';
 
 export type ScreenEvent = { at: number; on: boolean };
@@ -114,4 +114,43 @@ export function sleepPattern(nights: readonly NightShape[], targetBed: number): 
     usualBed > LATE_BED ? 'late' : hours < SHORT_HOURS ? 'short' : drift > MAX_DRIFT ? 'drift' : null;
   if (!flag) return null;
   return { flag, usualBed, tonight, hours, drift };
+}
+
+/** A day's screen use (4 am day): minutes on, and minutes on from 23:00 until the rollover. */
+export type ScreenDay = { day: string; onMin: number; lateMin: number };
+
+/** Hour of the 4 am day from which screen time counts as late (23:00). */
+const LATE_FROM = 23;
+
+/**
+ * Screen-on minutes per 4 am day from on/off events (oldest or newest first). Only whole days
+ * are returned: the first day the events reach into is partial, so it is left out; today is kept
+ * (it is still running).
+ */
+export function screenDays(events: readonly ScreenEvent[]): ScreenDay[] {
+  const sorted = [...events].sort((a, b) => a.at - b.at);
+  if (sorted.length === 0) return [];
+  const days = new Map<string, ScreenDay>();
+  const add = (at: number, minutes: number) => {
+    const date = new Date(at);
+    const day = dayKey(date);
+    const d = days.get(day) ?? { day, onMin: 0, lateMin: 0 };
+    d.onMin += minutes;
+    if (dayHour(date) >= LATE_FROM) d.lateMin += minutes;
+    days.set(day, d);
+  };
+  let since: number | null = null;
+  for (const e of sorted) {
+    if (e.on && since == null) since = e.at;
+    else if (!e.on && since != null) {
+      // Minute steps keep the day and late boundaries exact enough without slicing intervals.
+      for (let t = since; t < e.at; t += 60_000) add(t, Math.min(1, (e.at - t) / 60_000));
+      since = null;
+    }
+  }
+  const first = dayKey(new Date(sorted[0]!.at));
+  return [...days.values()]
+    .filter((d) => d.day !== first)
+    .map((d) => ({ ...d, onMin: Math.round(d.onMin), lateMin: Math.round(d.lateMin) }))
+    .sort((a, b) => b.day.localeCompare(a.day));
 }

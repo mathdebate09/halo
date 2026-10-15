@@ -12,7 +12,6 @@ import {
   sleepScore,
   stepGoalFor,
   tierFor,
-  vitalsScore,
   waterScore,
   type MealLog,
 } from '../src/scoring';
@@ -104,23 +103,13 @@ describe('activity blends today with the last week', () => {
   });
 });
 
-describe('vitals, water, sleep', () => {
+describe('water, sleep', () => {
   it('scores sleep against need', () => {
     expect(sleepScore(null)).toBeNull();
     expect(sleepScore(7.5)).toBe(100);
     expect(sleepScore(5.5)).toBe(50);
     expect(sleepScore(3.5)).toBe(0);
     expect(sleepScore(11.5)).toBe(80);
-  });
-  it('blends sleep with whichever readings exist', () => {
-    expect(vitalsScore({})).toEqual({ value: 70, dataBacked: false });
-    expect(vitalsScore({ sleepHours: 7.5, restingHr: 58, spo2: 97 }).value).toBe(100);
-    const rough = vitalsScore({ sleepHours: 5.5, restingHr: 90, systolic: 150, diastolic: 95 });
-    expect(rough.value).toBeLessThan(60);
-  });
-  it('only reads HRV against a baseline', () => {
-    expect(vitalsScore({ hrvMs: 30 }).dataBacked).toBe(false);
-    expect(vitalsScore({ hrvMs: 30, hrvBaselineMs: 50 }).value).toBe(40);
   });
   it('does not score water until it has been logged once', () => {
     expect(waterScore(0, 2000, 15, false)).toBeNull();

@@ -16,3 +16,4 @@ export * from './signals.js';
 export * from './sleep.js';
 export * from './sync.js';
 export * from './units.js';
+export * from './vitals.js';

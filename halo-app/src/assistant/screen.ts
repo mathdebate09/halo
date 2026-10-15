@@ -1,15 +1,16 @@
 // Sleep from the screen (chunk 17c): with Usage access, the overnight screen-off stretch is a
-// night's estimate. Read on launch and return to the app (throttled), kept in MMKV for the PA and
-// the wake-time learner. Without the native module (an older build) everything reads as unavailable.
+// night's estimate. Read on launch and return to the app (throttled), kept in MMKV for the PA,
+// the wake-time learner and the Vitals model (with each day's screen-on and late minutes). Without the native module (an older build) everything reads as unavailable.
 
 import { useMMKVString } from 'react-native-mmkv';
 
 import { kv } from '@/lib/kv';
-import { type SleepNight, sleepFromScreen } from '@/shared';
+import { type ScreenDay, screenDays, type SleepNight, sleepFromScreen } from '@/shared';
 
 import ScreenTime from '../../modules/screen-time/src/ScreenTimeModule';
 
 const NIGHTS_KEY = 'screen.nights';
+const DAYS_KEY = 'screen.days';
 const READ_AT_KEY = 'screen.readAt';
 const LOOKBACK_MS = 10 * 24 * 3_600_000;
 const THROTTLE_MS = 30 * 60_000;
@@ -38,23 +39,30 @@ export async function refreshScreenNights(force = false) {
   try {
     const events = await ScreenTime!.screenEvents(now - LOOKBACK_MS, now);
     kv.set(NIGHTS_KEY, JSON.stringify(sleepFromScreen(events)));
+    kv.set(DAYS_KEY, JSON.stringify(screenDays(events)));
   } catch {
     // Keep the last nights; the next return to the app tries again.
   }
 }
 
-const parse = (raw: string | undefined): SleepNight[] => {
+const parse = <T>(raw: string | undefined): T[] => {
   try {
-    return raw ? (JSON.parse(raw) as SleepNight[]) : [];
+    return raw ? (JSON.parse(raw) as T[]) : [];
   } catch {
     return [];
   }
 };
 
 /** The screen's nights, newest first. */
-export const readScreenNights = () => parse(kv.getString(NIGHTS_KEY));
+export const readScreenNights = () => parse<SleepNight>(kv.getString(NIGHTS_KEY));
 
 export function useScreenNights(): SleepNight[] {
   const [raw] = useMMKVString(NIGHTS_KEY, kv);
-  return parse(raw);
+  return parse<SleepNight>(raw);
+}
+
+/** Screen-on and late minutes per day, newest first (whole days only, plus today so far). */
+export function useScreenDays(): ScreenDay[] {
+  const [raw] = useMMKVString(DAYS_KEY, kv);
+  return parse<ScreenDay>(raw);
 }

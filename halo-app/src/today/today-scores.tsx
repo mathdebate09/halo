@@ -28,15 +28,22 @@ import {
   overallScore,
   type Score,
   stepGoalFor,
-  vitalsScore,
+  pickBands,
+  type VitalsInput,
+  vitalsHeadline,
+  type VitalsReport,
+  vitalsReport,
   waterScore,
 } from '@/shared';
 import { useHaloTheme } from '@/theme/theme-provider';
+import { useVitalsInput } from '@/vitals/inputs';
 
 import { decideDayTier, readDayTier, themeIdFor, writeDayTier } from './tier';
 
 /** Dev-screen override for the overall score (tests tiers without logging meals). */
 export const DEV_SCORE_OVERRIDE_KEY = 'dev.scoreOverride';
+/** Dev screen's "Vitals model trace": the latest report, its bands and headline. */
+export const VITALS_TRACE_KEY = 'vitals.trace';
 
 export type TodayScores = {
   day: string;
@@ -44,6 +51,9 @@ export type TodayScores = {
   diet: Score;
   activity: Score;
   vitals: Score;
+  /** The whole Vitals model (areas, sources) and what it was built from; the Vitals tab reads it. */
+  vitalsReport: VitalsReport;
+  vitalsInput: VitalsInput;
   /** 0-100, always present. */
   overall: number;
   /** 0-100 once water has ever been logged, otherwise null (not rated yet). */
@@ -79,18 +89,6 @@ function useNow() {
 
 const num = (v: string | number | null | undefined) => (v == null ? 0 : Number(v));
 const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.length;
-const VITALS_MAX_AGE_DAYS = 7;
-
-type HcRow = typeof hcDaily.$inferSelect;
-
-/** The most recent non-null value of a column within the last week (rows newest first). */
-function latest<K extends keyof HcRow>(rows: HcRow[], key: K, since: string): HcRow[K] | null {
-  for (const r of rows) {
-    if (r.day < since) break;
-    if (r[key] != null) return r[key];
-  }
-  return null;
-}
 
 export function TodayScoresProvider({ children }: { children: ReactNode }) {
   const now = useNow();
@@ -168,29 +166,33 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
   const recent = hcRows.filter((r) => r.day < day).slice(0, 7);
   const recentSteps = recent.map((r) => r.steps).filter((n): n is number => n != null);
   const stepGoal = stepGoalFor(recentSteps.length >= 3 ? mean(recentSteps) : null);
-  const activity = activityScore({
-    hour,
-    today: todayRow ?? {},
-    recent,
-    goals: {
-      steps: stepGoal,
-      activeKcal: plan ? activeKcalGoalFor(plan.bmr, plan.tdee) : 300,
-      exerciseMin: EXERCISE_GOAL_MIN,
-    },
-  });
+  const goals = {
+    steps: stepGoal,
+    activeKcal: plan ? activeKcalGoalFor(plan.bmr, plan.tdee) : 300,
+    exerciseMin: EXERCISE_GOAL_MIN,
+  };
+  const activity = activityScore({ hour, today: todayRow ?? {}, recent, goals });
 
-  const since = addDays(day, -VITALS_MAX_AGE_DAYS);
-  const hrvValues = hcRows.map((r) => r.hrvMs).filter((n): n is number => n != null);
-  const vitals = vitalsScore({
-    sleepHours: todayRow?.sleepMin == null ? null : todayRow.sleepMin / 60,
-    restingHr: latest(hcRows, 'restingHr', since),
-    hrvMs: latest(hcRows, 'hrvMs', since),
-    hrvBaselineMs: hrvValues.length >= 4 ? mean(hrvValues.slice(1)) : null,
-    spo2: latest(hcRows, 'spo2', since),
-    systolic: latest(hcRows, 'systolic', since),
-    diastolic: latest(hcRows, 'diastolic', since),
-    glucoseMgDl: latest(hcRows, 'glucoseMgDl', since),
+  // Vitals: every body signal (Health Connect, the screen, manual readings, weigh-ins), by area.
+  const vitalsInput = useVitalsInput(day, hcRows, goals, plan, profile, now);
+  const report = vitalsReport(vitalsInput);
+  const vitals = report.score;
+  const trace = JSON.stringify({
+    score: report.score,
+    confidence: report.confidence,
+    areas: report.areas.map((a) => ({
+      key: a.key,
+      score: a.score,
+      state: a.state,
+      source: a.source,
+      signals: a.signals.map((x) => `${x.key} ${Math.round(x.score)}·${x.source[0]}`),
+    })),
+    bands: pickBands(report.areas),
+    headline: vitalsHeadline(report.areas.filter((a) => pickBands(report.areas).includes(a.key))),
   });
+  useEffect(() => {
+    if (kv.getString(VITALS_TRACE_KEY) !== trace) kv.set(VITALS_TRACE_KEY, trace);
+  }, [trace]);
 
   const waterValue = plan
     ? waterScore(num(waterRows[0]?.ml), plan.waterMl, hour, (waterEver[0]?.n ?? 0) > 0)
@@ -214,6 +216,8 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
     diet,
     activity,
     vitals,
+    vitalsReport: report,
+    vitalsInput,
     overall,
     water: waterValue,
     provisional: rated == null,

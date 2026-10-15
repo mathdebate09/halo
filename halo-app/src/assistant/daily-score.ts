@@ -17,6 +17,7 @@ function write(s: TodayScores) {
     diet: s.diet.value,
     activity: s.activity.value,
     vitals: s.vitals.value,
+    sleep: s.vitalsReport.areas.find((a) => a.key === 'sleep')?.score ?? null,
     water: s.water,
     overall: s.overall,
     tier: s.provisional ? null : tierFor(s.overall),
@@ -25,6 +26,10 @@ function write(s: TodayScores) {
       activity: s.activity.dataBacked,
       vitals: s.vitals.dataBacked,
       provisional: s.provisional,
+      // Each Vitals area's score and the best source behind it (the weekly review, the advisor).
+      areas: Object.fromEntries(
+        s.vitalsReport.areas.map((a) => [a.key, { score: a.score, source: a.source }]),
+      ),
     },
     computedAt: Date.now(),
   });

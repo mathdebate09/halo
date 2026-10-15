@@ -36,6 +36,7 @@ import { and, count, desc, eq, isNull, sum } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 
 import { TRACE_KEY } from '@/assistant/assistant';
+import { VITALS_TRACE_KEY } from '@/today/today-scores';
 import { revertActed } from '@/assistant/loop-store';
 import {
   cancelSnoozes,
@@ -242,6 +243,25 @@ function AssistantRow() {
   return <Row title="Assistant (PA trace)" status={lines.join('\n')} />;
 }
 
+/** Read-only: the Vitals model as Today last computed it (areas, signals, bands, headline). */
+function VitalsRow() {
+  const [raw] = useMMKVString(VITALS_TRACE_KEY, kv);
+  let lines: string[] = ['No trace yet: open Today first.'];
+  if (raw) {
+    const t = JSON.parse(raw);
+    lines = [
+      `score ${t.score.value}${t.score.dataBacked ? '' : ' (prior)'} · confidence ${t.confidence}`,
+      ...t.areas.map(
+        (a: { key: string; score: number; state: string; source: string; signals: string[] }) =>
+          `${a.key} ${a.score} ${a.state} (${a.source}): ${a.signals.join(', ') || 'prior'}`,
+      ),
+      `bands: ${t.bands.join(', ')}`,
+      `headline: ${t.headline.headline} / ${t.headline.line}`,
+    ];
+  }
+  return <Row title="Vitals model trace" status={lines.join('\n')} />;
+}
+
 /** Usage access and the nights read from the screen (chunk 17c). */
 function ScreenTimeRow() {
   const nights = useScreenNights();
@@ -419,6 +439,7 @@ export default function DevScreen() {
         <ThemesRow />
         <TodayRow />
         <AssistantRow />
+        <VitalsRow />
         <NotifyPlanRow />
         <ScreenTimeRow />
         <StoreRow />

@@ -16,3 +16,4 @@ export * from './signals';
 export * from './sleep';
 export * from './sync';
 export * from './units';
+export * from './vitals';

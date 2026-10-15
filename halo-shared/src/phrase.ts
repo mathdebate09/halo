@@ -51,7 +51,7 @@ export type Phrased = z.infer<typeof phrasedSchema>;
 export type PhraseResult = { items: Phrased[] };
 
 // Words and habits that make copy read machine-written, or that talk about the machine.
-const BANNED: readonly RegExp[] = [
+export const BANNED: readonly RegExp[] = [
   /\bAI\b/,
   /\b(artificial|assistant|algorithm|insight|smart|data|tracking|app)\b/i,
   /\blet['’]s\b/i,

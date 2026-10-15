@@ -52,10 +52,10 @@ function paceScore(actual: number, expected: number): number {
 }
 
 /** 100 at or above pace, linear below it (no penalty for being ahead). */
-const atLeastScore = (actual: number, expected: number) => 100 * clamp(actual / expected, 0, 1);
+export const atLeastScore = (actual: number, expected: number) => 100 * clamp(actual / expected, 0, 1);
 
 /** Piecewise-linear lookup through sorted [x, score] points, flat beyond the ends. */
-function curve(x: number, points: [number, number][]): number {
+export function curve(x: number, points: [number, number][]): number {
   if (x <= points[0]![0]) return points[0]![1];
   for (let i = 1; i < points.length; i++) {
     const [x1, y1] = points[i]!;
@@ -77,7 +77,7 @@ export const PROVISIONAL_PRIOR = 70;
 type Signal = { score: number | null | undefined; weight: number };
 
 /** Weighted mean of the signals that exist; null when none do. */
-function blend(signals: Signal[]): number | null {
+export function blend(signals: Signal[]): number | null {
   let sum = 0;
   let weight = 0;
   for (const s of signals) {
@@ -192,7 +192,7 @@ export const activeKcalGoalFor = (bmr: number, tdee: number) =>
 export const EXERCISE_GOAL_MIN = 30;
 
 /** Steps (50), active calories (25) and exercise minutes (25) against `fraction` of the goals. */
-function activityDayScore(day: ActivityDay, goals: ActivityGoals, fraction: number) {
+export function activityDayScore(day: ActivityDay, goals: ActivityGoals, fraction: number) {
   return blend([
     { score: day.steps == null ? null : atLeastScore(day.steps, goals.steps * fraction), weight: 50 },
     {
@@ -232,7 +232,7 @@ export function activityScore(input: ActivityInput): Score {
   return backed(fraction * today + (1 - fraction) * week);
 }
 
-// ── Vitals (incl. last night's sleep) ───────────────────────────────────────────
+// ── Sleep and body readings (used by the Vitals model in vitals.ts) ─────────────
 
 /** Sleep: 100 at the need, 0 at four hours short; a small penalty for 2 h+ over. */
 export function sleepScore(hours: number | null, needHours = 7.5): number | null {
@@ -242,56 +242,18 @@ export function sleepScore(hours: number | null, needHours = 7.5): number | null
   return round(over <= 2 ? 100 : 100 - Math.min(20, (over - 2) * 10));
 }
 
-export type VitalsInput = {
-  sleepHours?: number | null;
-  sleepNeedHours?: number;
-  restingHr?: number | null;
-  hrvMs?: number | null;
-  /** The user's own recent HRV average; HRV is only meaningful against it. */
-  hrvBaselineMs?: number | null;
-  spo2?: number | null;
-  systolic?: number | null;
-  diastolic?: number | null;
-  glucoseMgDl?: number | null;
-};
-
-const restingHrScore = (bpm: number) =>
+export const restingHrScore = (bpm: number) =>
   curve(bpm, [[35, 80], [45, 100], [62, 100], [80, 75], [100, 40], [120, 0]]);
-const hrvScore = (ms: number, baseline: number) =>
+export const hrvScore = (ms: number, baseline: number) =>
   curve(ms / baseline, [[0.6, 40], [0.95, 100]]);
-const spo2Score = (pct: number) => curve(pct, [[85, 0], [90, 50], [95, 100]]);
-const bloodPressureScore = (sys: number, dia: number) =>
+export const spo2Score = (pct: number) => curve(pct, [[85, 0], [90, 50], [95, 100]]);
+export const bloodPressureScore = (sys: number, dia: number) =>
   Math.min(
     curve(sys, [[80, 50], [90, 80], [100, 100], [120, 100], [140, 60], [160, 30], [180, 0]]),
     curve(dia, [[50, 60], [60, 100], [80, 100], [90, 60], [100, 30], [110, 0]]),
   );
-const glucoseScore = (mgDl: number) =>
+export const glucoseScore = (mgDl: number) =>
   curve(mgDl, [[54, 30], [70, 80], [80, 100], [140, 100], [200, 40], [250, 20]]);
-
-/**
- * Vitals: last night's sleep (weight 2) and each recent reading that exists (weight 1 each):
- * resting heart rate, HRV against the user's baseline, SpO2, blood pressure, glucose. A score,
- * never a diagnosis.
- */
-export function vitalsScore(input: VitalsInput): Score {
-  const hrvOk = input.hrvMs != null && input.hrvBaselineMs != null && input.hrvBaselineMs > 0;
-  return backed(
-    blend([
-      { score: sleepScore(input.sleepHours ?? null, input.sleepNeedHours), weight: 2 },
-      { score: input.restingHr == null ? null : restingHrScore(input.restingHr), weight: 1 },
-      { score: hrvOk ? hrvScore(input.hrvMs!, input.hrvBaselineMs!) : null, weight: 1 },
-      { score: input.spo2 == null ? null : spo2Score(input.spo2), weight: 1 },
-      {
-        score:
-          input.systolic == null || input.diastolic == null
-            ? null
-            : bloodPressureScore(input.systolic, input.diastolic),
-        weight: 1,
-      },
-      { score: input.glucoseMgDl == null ? null : glucoseScore(input.glucoseMgDl), weight: 1 },
-    ]),
-  );
-}
 
 // ── Water and overall ───────────────────────────────────────────────────────────
 
