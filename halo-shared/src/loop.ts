@@ -75,7 +75,7 @@ export type Transition = { id: string; state: InsightState; at: number };
 /**
  * What changed since the stored states: today's open insights resolve when their gap closes and
  * are ignored once they expire untouched; anything still open from an earlier day is closed out
- * (sleep by how last night went).
+ * (sleep by how last night went). A missed notification ('pending') is never counted as ignored.
  */
 export function transitions(history: readonly InsightRecord[], ctx: PaContext): Transition[] {
   const out: Transition[] = [];
@@ -85,12 +85,14 @@ export function transitions(history: readonly InsightRecord[], ctx: PaContext): 
   const sleptEnough =
     ctx.facts.sleepHours != null && ctx.facts.sleepHours >= ctx.facts.sleepNeedHours - CAUGHT_UP;
   for (const r of history) {
-    if (r.state !== 'shown' && r.state !== 'acted') continue;
+    // 'pending' is a notification still unseen in the tray: it can resolve, never be ignored.
+    if (r.state !== 'shown' && r.state !== 'acted' && r.state !== 'pending') continue;
     if (r.day === ctx.day) {
       if (isResolved(r, ctx)) set(r, 'resolved');
       else if (r.state === 'shown' && r.expiresAt != null && ctx.now > r.expiresAt) set(r, 'ignored');
     } else if (r.day === addDays(ctx.day, -1) && isSleep(r.type)) {
-      set(r, sleptEnough ? 'resolved' : r.state === 'acted' ? 'acted' : 'ignored');
+      if (sleptEnough) set(r, 'resolved');
+      else if (r.state === 'shown') set(r, 'ignored');
     } else if (r.state === 'shown') {
       set(r, 'ignored');
     }

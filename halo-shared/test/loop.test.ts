@@ -76,6 +76,17 @@ describe('transitions', () => {
   });
 });
 
+describe('missed notifications', () => {
+  it('can resolve but are never counted as ignored', () => {
+    const missed = record({ state: 'pending', expiresAt: NOW - 1 });
+    const behind = { intake: { kcal: 1000, proteinG: 30, carbsG: 110, fatG: 32 } };
+    expect(transitions([missed], ctx({}, behind))).toEqual([]);
+    expect(transitions([missed], ctx())[0]?.state).toBe('resolved');
+    const old = record({ id: '2026-10-12:water_pace', day: '2026-10-12', type: 'water_pace', state: 'pending' });
+    expect(transitions([old], ctx())).toEqual([]);
+  });
+});
+
 describe('back-off', () => {
   it('counts ignores in a row, newest first, broken by an acted one', () => {
     const history = [

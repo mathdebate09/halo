@@ -108,15 +108,20 @@ function vet(ctx: PaContext, signals: Signal[]): { kept: Signal[]; dropped: Drop
 /** A prepared action is worth more than advice alone. */
 const scoreOf = (s: Signal) => round(s.severity * (s.action ? 1 : 0.6), 1);
 
-/** The one brief for right now. `held` is the brief on screen, kept unless clearly beaten. */
-export function brief(ctx: PaContext, held: Held = null): Brief {
+/** Every signal that passes the PA's vetting, best first, with the trace of how it got there. */
+export function rankSignals(ctx: PaContext) {
   const weighDue = weighInDue(ctx.history, ctx.day, ctx.lastWeighDay);
   const signals = detectSignals(ctx, weighDue);
   const { kept, dropped, notes } = vet(ctx, signals);
-
   const ranked = kept
     .map((s) => ({ signal: s, score: scoreOf(s) }))
     .sort((a, b) => b.score - a.score);
+  return { signals, dropped, notes, ranked };
+}
+
+/** The one brief for right now. `held` is the brief on screen, kept unless clearly beaten. */
+export function brief(ctx: PaContext, held: Held = null): Brief {
+  const { signals, dropped, notes, ranked } = rankSignals(ctx);
   let pick = ranked[0] ?? { signal: onTrack(ctx), score: scoreOf(onTrack(ctx)) };
 
   let isHeld = false;

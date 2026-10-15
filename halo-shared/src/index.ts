@@ -4,6 +4,7 @@ export * from './insights';
 export * from './learning';
 export * from './loop';
 export * from './meals';
+export * from './moments';
 export * from './pa';
 export * from './phrase';
 export * from './plan';

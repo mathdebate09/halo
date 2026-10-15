@@ -62,6 +62,7 @@ describe('phrase guard', () => {
       'About {gap} g short for {at} — a yogurt helps.',
       'About {gap} g short for {at} 💪',
       'Your data shows {gap} g short at {at}.',
+      'No pressure, {gap} g short for {at}.',
     ]) {
       expect(phraseProblem(pattern, { ...ok, line }), line).not.toBeNull();
     }

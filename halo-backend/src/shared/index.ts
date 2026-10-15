@@ -6,6 +6,7 @@ export * from './insights.js';
 export * from './learning.js';
 export * from './loop.js';
 export * from './meals.js';
+export * from './moments.js';
 export * from './pa.js';
 export * from './phrase.js';
 export * from './plan.js';

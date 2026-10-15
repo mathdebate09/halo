@@ -11,7 +11,7 @@ import { placeholders } from './brief-copy';
 import { INSIGHT_KINDS, type InsightCopy } from './signals';
 
 /** Bump when the prompt or the guard changes, so cached wording is asked for again. */
-export const PHRASE_VERSION = 3;
+export const PHRASE_VERSION = 4;
 export const MAX_PHRASE_ITEMS = 4;
 export const PHRASE_LIMITS = { tagline: 32, line: 120, actionLabel: 26 } as const;
 
@@ -63,6 +63,7 @@ const BANNED: readonly RegExp[] = [
   /\bkeep up the\b/i,
   /\b(journey|boost|fuel your|crush|unlock|elevate|empower|wellness)\b/i,
   /\b(here['’]s|consider|why not)\b/i,
+  /\b(no pressure|within reach|ease (into|up)|gently|treat yourself|self[- ]care)\b/i,
   /[!;—–]/,
   /\p{Extended_Pictographic}/u,
 ];

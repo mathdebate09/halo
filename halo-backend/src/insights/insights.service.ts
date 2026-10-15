@@ -17,10 +17,11 @@ Rules:
 - tagline: 2 to 4 words, at most 28 characters, no full stop.
 - line: one or two short sentences, at most 110 characters.
 - actionLabel: at most 24 characters, starting with a verb; null when the pattern's is null.
+- The tagline keeps what the pattern's tagline is about (bed, the weigh-in, the meal, water, protein).
 - Ask a question only if the pattern asks one.
 - Never mention AI, apps, data, tracking, insights or yourself.
 - No exclamation marks, emoji, dashes or semicolons.
-- Avoid: let's, great job, remember to, don't forget, it looks like, journey, boost, fuel, you've got this, here's, consider.
+- Avoid filler and coaching talk: let's, great job, remember to, don't forget, it looks like, no pressure, within reach, ease into, gently, journey, boost, fuel, you've got this, here's, consider.
 - Write your own version: never return the pattern unchanged.`;
 
 const answerSchema = z.object({ items: z.array(phrasedSchema.partial({ actionLabel: true })) });

@@ -2,9 +2,11 @@ import '../global.css';
 
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { setupNotifications, useNotificationResponses } from '@/assistant/notify';
 import { LaunchSequence } from '@/components/launch-sequence';
 import { ToastHost } from '@/components/toast';
 import { DataGate } from '@/db/data-gate';
@@ -18,6 +20,11 @@ SplashScreen.preventAutoHideAsync();
 function RootNavigator() {
   const { theme } = useHaloTheme();
   const onboarded = useOnboarded();
+  useNotificationResponses();
+  useEffect(() => {
+    // Channels, buttons and the background action task; failures only cost the push path.
+    setupNotifications().catch(() => {});
+  }, []);
   const navigationTheme = {
     ...DarkTheme,
     colors: { ...DarkTheme.colors, background: theme.colors.bg, card: theme.colors.bg },

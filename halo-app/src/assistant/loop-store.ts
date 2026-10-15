@@ -88,3 +88,50 @@ export function applyTransitions(list: readonly Transition[]) {
     });
   }
 }
+
+/** What a scheduled notification remembers about its brief (it outlives the render). */
+export type NotifiedInsight = Pick<
+  Insight,
+  'id' | 'type' | 'severity' | 'reason' | 'action' | 'expiresAt'
+> & { day: string };
+
+/**
+ * A delivered notification's outcome: acted (tapped or an action button), pending (still unseen
+ * in the tray, i.e. missed) or ignored (swiped away). Creates the row if the brief never showed in
+ * the app; never downgrades a row that's already further along.
+ */
+export function recordNotification(
+  meta: NotifiedInsight,
+  state: 'acted' | 'pending' | 'ignored',
+  at: number,
+  notificationId: string,
+) {
+  const row = findRow(meta.id);
+  if (!row) {
+    upsertRecord('insight', {
+      id: meta.id,
+      day: meta.day,
+      type: meta.type,
+      severity: Math.round(meta.severity),
+      reason: meta.reason,
+      action: meta.action,
+      expiresAt: meta.expiresAt,
+      state,
+      channel: 'notification',
+      shownAt: at,
+      notificationId,
+      ...(state === 'acted' ? { actedAt: at } : {}),
+    });
+    return;
+  }
+  if (row.state === 'resolved' || row.state === 'acted') return;
+  if (state === 'pending' && row.state === 'shown') return; // already seen in the app
+  writeState(row, {
+    state,
+    notificationId,
+    ...(state === 'acted' ? { actedAt: at } : {}),
+  });
+}
+
+/** The stored state of an insight, if it has a row. */
+export const stateOf = (id: string) => findRow(id)?.state ?? null;

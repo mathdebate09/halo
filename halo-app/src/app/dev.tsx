@@ -36,12 +36,14 @@ import { and, count, desc, eq, isNull, sum } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 
 import { TRACE_KEY } from '@/assistant/assistant';
+import { LAST_RESPONSE_KEY, readScheduled, sendTestOfNext } from '@/assistant/notify';
 import { HeroBackdrop } from '@/components/hero-backdrop';
 import { ThemedScreen } from '@/components/themed-screen';
 import { useHaloTheme } from '@/theme/theme-provider';
 import { db } from '@/db/client';
 import { deleteRecord, upsertRecord } from '@/db/mutate';
 import { outbox, water } from '@/db/schema';
+import { formatTime } from '@/lib/clock';
 import { getDevice } from '@/lib/device';
 import { kv } from '@/lib/kv';
 import { resetOnboarding, useOnboarding } from '@/onboarding/state';
@@ -61,15 +63,6 @@ import PdfRenderer from '../../modules/pdf-renderer/src/PdfRendererModule';
 // probe. Kept for demo mode later; not part of the product UI.
 
 const storage = createMMKV({ id: 'dev' });
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
 
 function errorText(e: unknown) {
   const err = e as { code?: string; message?: string };
@@ -234,6 +227,34 @@ function AssistantRow() {
   return <Row title="Assistant (PA trace)" status={lines.join('\n')} />;
 }
 
+/** The notification plan (read-only) and a test send that changes nothing when answered. */
+function NotifyPlanRow() {
+  const [status, setStatus] = useState('');
+  const [lastResponse] = useMMKVString(LAST_RESPONSE_KEY, kv);
+  const plan = readScheduled()
+    .filter((s) => s.at > Date.now())
+    .map(
+      (s) =>
+        `${formatTime(new Date(s.at))}${s.snooze ? ' (snoozed)' : ''} · ${s.title} / ${s.body}`,
+    );
+  return (
+    <Row
+      title="Notification plan"
+      status={[
+        plan.join('\n') || 'nothing planned',
+        lastResponse ? `last test response: ${lastResponse}` : '',
+        status,
+      ]
+        .filter(Boolean)
+        .join('\n')}>
+      <Btn
+        label="Test next in 10 s"
+        onPress={() => sendTestOfNext().then(setStatus, (e) => setStatus(errorText(e)))}
+      />
+    </Row>
+  );
+}
+
 function ThemesRow() {
   const { theme, target, setThemeId } = useHaloTheme();
   const [preview, setPreview] = useState(false);
@@ -339,6 +360,7 @@ export default function DevScreen() {
         <ThemesRow />
         <TodayRow />
         <AssistantRow />
+        <NotifyPlanRow />
         <StoreRow />
         <SyncRow />
 

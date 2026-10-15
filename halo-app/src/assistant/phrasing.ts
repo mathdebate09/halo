@@ -10,6 +10,7 @@ import { AppState } from 'react-native';
 import { kv } from '@/lib/kv';
 import {
   type Brief,
+  type Insight,
   briefPattern,
   fillPattern,
   type Goal,
@@ -64,20 +65,28 @@ function writePhrase(key: string, copy: InsightCopy) {
 
 /** The phrase request for a brief, or null for on-track days (the tier's lines speak then). */
 export function phraseItemFor(
-  brief: Brief,
+  insight: Insight,
   tier: Tier,
   hour: number,
   goal: Goal,
 ): PhraseItem | null {
-  if (brief.insight.type === 'on_track') return null;
+  if (insight.type === 'on_track') return null;
   const base = {
-    kind: brief.insight.type,
+    kind: insight.type,
     tier,
     slot: slotFor(hour),
     goal,
-    pattern: briefPattern(brief.insight),
+    pattern: briefPattern(insight),
   };
   return { key: phraseKey(base), ...base };
+}
+
+/** An insight's words: cached rewording filled with its numbers, else its template. */
+export function wordsFor(insight: Insight, key: string | null): InsightCopy {
+  const cached = key ? readPhrase(key) : null;
+  // Re-checked on every read, so a stricter guard also retires words cached under an older one.
+  if (!cached || phraseProblem(briefPattern(insight), cached)) return insight.copy;
+  return fillPattern(cached, insight.facts);
 }
 
 // One request at a time, batched, debounced; each key asked at most once per app session.
@@ -156,6 +165,9 @@ export function useBriefWords(brief: Brief, phrase: string | null): InsightCopy 
     return () => sub.remove();
   }, []);
   // epoch is the re-read trigger.
+  // The cached pattern is read only here (epoch is the re-read trigger); numbers fill live.
   const cached = useMemo(() => (phrase ? readPhrase(phrase) : null), [phrase, epoch]);
-  return cached ? fillPattern(cached, brief.insight.facts) : brief.insight.copy;
+  const { insight } = brief;
+  if (!cached || phraseProblem(briefPattern(insight), cached)) return insight.copy;
+  return fillPattern(cached, insight.facts);
 }

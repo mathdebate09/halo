@@ -4,7 +4,7 @@
 
 import { and, desc, eq, isNull, max } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { createContext, type ReactNode, use, useEffect } from 'react';
+import { createContext, type ReactNode, use, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { db } from '@/db/client';
@@ -26,6 +26,7 @@ import { useTodayScores } from '@/today/today-scores';
 import { useDailyScoreWriter } from './daily-score';
 import { isWeekend, noteAppOpen, refreshLearned, useLearned, windowsOn } from './learned';
 import { applyTransitions, useInsightHistory } from './loop-store';
+import { reschedule } from './notify';
 import { phraseItemFor, readPhrase, requestPhrases } from './phrasing';
 
 /** The brief on screen, kept across renders and restarts so it doesn't flip (PA hold). */
@@ -132,12 +133,32 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, [briefId]);
 
   // Pre-compute the brief's words in the background whenever its situation changes.
-  const phraseItem = phraseItemFor(result, target.tier, context.hour, facts.goal);
+  const phraseItem = phraseItemFor(result.insight, target.tier, context.hour, facts.goal);
   const phrase = phraseItem?.key ?? null;
   useEffect(() => {
     if (phraseItem) requestPhrases([phraseItem]);
     // Keyed on the phrase key: the item is rebuilt every render.
   }, [phrase]);
+
+  // Re-plan notifications after every log, weigh-in or return to the app (learning refreshes on
+  // foreground, which changes `learned`), a moment after things settle.
+  const latest = useRef({ context, tier: target.tier });
+  latest.current = { context, tier: target.tier };
+  const planKey = [
+    day,
+    facts.mealsLogged,
+    facts.waterMl,
+    context.weighedToday,
+    context.lastLogAt,
+    learned?.updatedAt,
+  ].join('|');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const { context: c, tier } = latest.current;
+      reschedule(c, tier, c.facts.goal).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [planKey]);
 
   // Close the loop: gaps that closed resolve, untouched briefs past their time are ignored.
   const pending = transitions(records, context);
