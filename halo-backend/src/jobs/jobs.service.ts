@@ -17,6 +17,8 @@ import { Job } from './job.schema.js';
 
 type JobDoc = Job & { _id: { toString(): string } };
 
+const DAY_MS = 24 * 3600 * 1000;
+
 const view = (job: JobDoc): JobView => ({
   id: job._id.toString(),
   kind: job.kind,
@@ -49,15 +51,27 @@ export class JobsService implements OnModuleInit {
 
   /**
    * Starts `work` as a job, or returns the existing job for this device + key (idempotent). A
-   * device may have MAX_JOBS_PER_DEVICE jobs queued or running at once.
+   * device may have `limits.inFlight` jobs of this kind queued or running at once (default
+   * MAX_JOBS_PER_DEVICE), and start at most `limits.perDay` new ones in 24 h.
    */
-  async start(deviceId: string, kind: string, key: string, work: () => Promise<unknown>): Promise<JobView> {
+  async start(
+    deviceId: string,
+    kind: string,
+    key: string,
+    work: () => Promise<unknown>,
+    limits: { inFlight?: number; perDay?: number } = {},
+  ): Promise<JobView> {
     const existing = await this.jobs.findOne({ deviceId, key }).lean<JobDoc>();
     if (existing && existing.status !== 'failed') return view(existing);
 
-    const active = await this.jobs.countDocuments({ deviceId, status: { $in: ['queued', 'running'] } });
-    if (active >= this.env.MAX_JOBS_PER_DEVICE) {
+    const active = await this.jobs.countDocuments({ deviceId, kind, status: { $in: ['queued', 'running'] } });
+    if (active >= (limits.inFlight ?? this.env.MAX_JOBS_PER_DEVICE)) {
       throw new HttpException('Too many jobs in progress', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    // A failed key retried in place was already counted.
+    if (limits.perDay != null && !existing) {
+      const today = await this.jobs.countDocuments({ deviceId, kind, createdAt: { $gte: new Date(Date.now() - DAY_MS) } });
+      if (today >= limits.perDay) throw new HttpException('Daily limit reached', HttpStatus.TOO_MANY_REQUESTS);
     }
 
     // A failed job with the same key is retried in place.

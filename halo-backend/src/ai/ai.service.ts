@@ -30,6 +30,13 @@ export class AiUnavailableError extends Error {
   }
 }
 
+/** The answer hit `maxTokens` and was cut off; the same input would be cut off again. */
+export class AiTruncatedError extends AiUnavailableError {
+  constructor() {
+    super('truncated');
+  }
+}
+
 /** Retries are worth it for these; a 4xx (bad request, auth) would fail the same way again. */
 class RetryableError extends Error {}
 
@@ -61,6 +68,10 @@ export class AiService {
         if (parsed.success) return parsed.data;
         throw new RetryableError('invalid_json_shape');
       } catch (error) {
+        if (error instanceof AiTruncatedError) {
+          this.logger.warn(`AI attempt ${attempt} truncated after ${Date.now() - started} ms`);
+          throw error;
+        }
         last = error instanceof Error ? error.message : 'error';
         const retryable = error instanceof RetryableError || error instanceof SyntaxError;
         this.logger.warn(`AI attempt ${attempt} failed: ${retryable ? last : 'fatal'} after ${Date.now() - started} ms`);
@@ -98,7 +109,10 @@ export class AiService {
     }
     if (response.status === 429 || response.status >= 500) throw new RetryableError(`http_${response.status}`);
     if (!response.ok) throw new Error(`http_${response.status}`);
-    const body = (await response.json()) as { choices?: { message?: { content?: string | null } }[] };
+    const body = (await response.json()) as {
+      choices?: { message?: { content?: string | null }; finish_reason?: string | null }[];
+    };
+    if (body.choices?.[0]?.finish_reason === 'length') throw new AiTruncatedError();
     const content = body.choices?.[0]?.message?.content?.trim();
     // DeepSeek's JSON mode can occasionally return empty content.
     if (!content) throw new RetryableError('empty');

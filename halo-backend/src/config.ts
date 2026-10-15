@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 
 import { z } from 'zod';
 
-import { appKeySchema } from './shared/index.js';
+import { appKeySchema, REPORT_LIMITS } from './shared/index.js';
 
 // Local dev reads halo-backend/.env (never committed); Heroku sets config vars directly.
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -22,8 +22,11 @@ const envSchema = z.object({
   DEEPSEEK_MODEL: z.string().min(1).default('deepseek-flash'),
   /** Per-attempt timeout for an AI call. */
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),
-  /** Jobs a device may have queued or running at once. */
+  /** Jobs of one kind (meal photos) a device may have queued or running at once. */
   MAX_JOBS_PER_DEVICE: z.coerce.number().int().positive().default(2),
+  /** Report pages a device may have running at once, and send per 24 h. */
+  REPORT_PAGES_IN_FLIGHT: z.coerce.number().int().positive().default(REPORT_LIMITS.pagesInFlight),
+  REPORT_PAGES_PER_DAY: z.coerce.number().int().positive().default(REPORT_LIMITS.pagesPerDay),
 });
 
 export type Env = z.infer<typeof envSchema>;

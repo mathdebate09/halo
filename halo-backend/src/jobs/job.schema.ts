@@ -34,4 +34,5 @@ export class Job {
 export const JobSchema = SchemaFactory.createForClass(Job);
 JobSchema.index({ deviceId: 1, key: 1 }, { unique: true });
 JobSchema.index({ deviceId: 1, status: 1 });
+JobSchema.index({ deviceId: 1, kind: 1, createdAt: 1 });
 JobSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 });

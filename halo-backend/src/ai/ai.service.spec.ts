@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { loadEnv } from '../config.js';
-import { AiService, AiUnavailableError } from './ai.service.js';
+import { AiService, AiTruncatedError, AiUnavailableError } from './ai.service.js';
 
 const env = (key?: string) =>
   loadEnv({
@@ -13,8 +13,8 @@ const env = (key?: string) =>
 const schema = z.object({ ok: z.boolean() });
 const request = { messages: [{ role: 'user' as const, content: 'json please' }], schema, maxTokens: 50 };
 
-const reply = (content: string | null, status = 200) =>
-  new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status });
+const reply = (content: string | null, status = 200, finish = 'stop') =>
+  new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason: finish }] }), { status });
 
 describe('AiService', () => {
   const fetchMock = vi.fn<typeof fetch>();
@@ -48,6 +48,12 @@ describe('AiService', () => {
     fetchMock.mockResolvedValueOnce(reply('')).mockResolvedValueOnce(reply('{"ok":"yes"}'));
     await expect(new AiService(env('k')).json(request)).rejects.toBeInstanceOf(AiUnavailableError);
     expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('reports a cut-off answer at once, without retrying', async () => {
+    fetchMock.mockResolvedValueOnce(reply('{"ok":tr', 200, 'length'));
+    await expect(new AiService(env('k')).json(request)).rejects.toBeInstanceOf(AiTruncatedError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('does not retry a 4xx', async () => {

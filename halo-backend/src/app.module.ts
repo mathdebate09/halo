@@ -13,6 +13,7 @@ import { InsightsModule } from './insights/insights.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
 import { LegalController } from './legal/legal.controller.js';
 import { MealsModule } from './meals/meals.module.js';
+import { ReportsModule } from './reports/reports.module.js';
 import { SyncModule } from './sync/sync.module.js';
 
 @Module({})
@@ -31,6 +32,7 @@ export class AppModule {
         SyncModule,
         JobsModule,
         MealsModule,
+        ReportsModule,
         InsightsModule,
       ],
       controllers: [HealthController, LegalController],
