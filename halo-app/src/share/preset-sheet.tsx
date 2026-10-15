@@ -139,6 +139,8 @@ export function PresetSheet({ open, onClose, onPick, snapshot, width, height }: 
           </View>
         </GestureDetector>
         <ScrollView
+          // Each tab opens at its top.
+          key={tab}
           contentContainerStyle={{
             padding: PAD,
             paddingBottom: PAD + insets.bottom,
@@ -147,23 +149,17 @@ export function PresetSheet({ open, onClose, onPick, snapshot, width, height }: 
             gap: GAP,
           }}
           showsVerticalScrollIndicator={false}>
-          {presets.length === 0 ? (
-            <Text className="w-full py-10 text-center font-sans text-[15px] text-text/60">
-              Coming soon
-            </Text>
-          ) : (
-            presets.map((preset) => (
-              <PressScale
-                key={preset.id}
-                accessibilityRole="button"
-                accessibilityLabel={`Add ${preset.label}`}
-                onPress={() => onPick(preset)}
-                className="items-center justify-center overflow-hidden rounded-[20px] bg-glass/5"
-                style={{ width: tileW, height: tileW }}>
-                <Preview preset={preset} snapshot={snapshot} size={tileW - 24} />
-              </PressScale>
-            ))
-          )}
+          {presets.map((preset) => (
+            <PressScale
+              key={preset.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Add ${preset.label}`}
+              onPress={() => onPick(preset)}
+              className="items-center justify-center overflow-hidden rounded-[20px] bg-glass/5"
+              style={{ width: tileW, height: tileW }}>
+              <Preview preset={preset} snapshot={snapshot} size={tileW - 24} />
+            </PressScale>
+          ))}
         </ScrollView>
       </Animated.View>
     </View>

@@ -17,10 +17,12 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
 // A drop in a 100 × 120 box: tip at the top, round at the bottom (y 4 → 116).
-const DROP = 'M50 4 C50 4 12 46 12 76 A38 38 0 0 0 88 76 C88 46 50 4 50 4 Z';
-const TOP = 4;
-const BOTTOM = 116;
-const WATER = '#8DB3E2'; // a calm blue: water reads as water whatever the tier
+export const DROP = 'M50 4 C50 4 12 46 12 76 A38 38 0 0 0 88 76 C88 46 50 4 50 4 Z';
+export const DROP_TOP = 4;
+export const DROP_BOTTOM = 116;
+const TOP = DROP_TOP;
+const BOTTOM = DROP_BOTTOM;
+export const WATER = '#8DB3E2'; // a calm blue: water reads as water whatever the tier
 const PERIOD = 50;
 const AMPLITUDE = 3.5;
 
