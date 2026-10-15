@@ -1,4 +1,5 @@
 export * from './day';
+export * from './insights';
 export * from './meals';
 export * from './plan';
 export * from './scoring';

@@ -1,6 +1,7 @@
 // GENERATED from halo-shared/src/index.ts by halo-shared/scripts/sync.mjs. Do not edit.
 
 export * from './day.js';
+export * from './insights.js';
 export * from './meals.js';
 export * from './plan.js';
 export * from './scoring.js';

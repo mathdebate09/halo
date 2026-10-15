@@ -11,13 +11,15 @@ import { db } from '@/db/client';
 import { hcDaily, meals, water } from '@/db/schema';
 import { refreshHealthData } from '@/lib/health-connect';
 import { kv } from '@/lib/kv';
-import { usePlan } from '@/lib/plan';
+import { usePlan, useProfile } from '@/lib/plan';
 import {
   activeKcalGoalFor,
   activityScore,
   addDays,
   dayKey,
+  type DayFacts,
   dietScore,
+  expectedDayFraction,
   expectedIntakeFraction,
   EXERCISE_GOAL_MIN,
   hourOfDay,
@@ -46,6 +48,8 @@ export type TodayScores = {
   provisional: boolean;
   /** Today's logged intake against where it should be by now (meal reactions). */
   intake: { kcal: number; proteinG: number; expectedKcal: number; expectedProteinG: number };
+  /** Everything Learn more's summary and panels are built from. */
+  facts: DayFacts;
 };
 
 const TodayContext = createContext<TodayScores | null>(null);
@@ -88,6 +92,7 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
   const now = useNow();
   const day = dayKey(now);
   const plan = usePlan();
+  const profile = useProfile();
   const { setThemeId } = useHaloTheme();
   const [override] = useMMKVNumber(DEV_SCORE_OVERRIDE_KEY, kv);
 
@@ -153,12 +158,13 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
   const todayRow = hcRows.find((r) => r.day === day);
   const recent = hcRows.filter((r) => r.day < day).slice(0, 7);
   const recentSteps = recent.map((r) => r.steps).filter((n): n is number => n != null);
+  const stepGoal = stepGoalFor(recentSteps.length >= 3 ? mean(recentSteps) : null);
   const activity = activityScore({
     hour,
     today: todayRow ?? {},
     recent,
     goals: {
-      steps: stepGoalFor(recentSteps.length >= 3 ? mean(recentSteps) : null),
+      steps: stepGoal,
       activeKcal: plan ? activeKcalGoalFor(plan.bmr, plan.tdee) : 300,
       exerciseMin: EXERCISE_GOAL_MIN,
     },
@@ -201,6 +207,33 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
     vitals,
     overall,
     provisional: rated == null,
+    facts: {
+      hour,
+      goal: profile?.goal ?? 'maintain',
+      mealsLogged: mealRows.length,
+      loggedTypes: [...new Set(mealRows.map((m) => m.mealType))],
+      intake: {
+        kcal: mealRows.reduce((a, m) => a + num(m.kcal), 0),
+        proteinG: mealRows.reduce((a, m) => a + num(m.proteinG), 0),
+        carbsG: mealRows.reduce((a, m) => a + num(m.carbsG), 0),
+        fatG: mealRows.reduce((a, m) => a + num(m.fatG), 0),
+      },
+      targets: {
+        kcal: targetKcal,
+        proteinG: targetProteinG,
+        carbsG: plan?.carbsG ?? 250,
+        fatG: plan?.fatG ?? 65,
+        waterMl: plan?.waterMl ?? 2500,
+        steps: stepGoal,
+      },
+      due,
+      dayFraction: expectedDayFraction(hour),
+      waterMl: num(waterRows[0]?.ml),
+      steps: todayRow?.steps ?? null,
+      sleepHours: todayRow?.sleepMin == null ? null : todayRow.sleepMin / 60,
+      sleepNeedHours: 7.5,
+      dietScore: diet.value,
+    },
     intake: {
       kcal: mealRows.reduce((a, m) => a + num(m.kcal), 0),
       proteinG: mealRows.reduce((a, m) => a + num(m.proteinG), 0),

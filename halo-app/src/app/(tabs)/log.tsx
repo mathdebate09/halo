@@ -72,7 +72,7 @@ export default function MealLogger() {
   const insets = useSafeAreaInsets();
   const { theme } = useHaloTheme();
   const focused = useIsFocused();
-  const params = useLocalSearchParams<{ meal?: string }>();
+  const params = useLocalSearchParams<{ meal?: string; note?: string }>();
   const { reaction, reset: resetReaction } = useMealReaction(useTodayScores());
 
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -113,6 +113,13 @@ export default function MealLogger() {
     setToastLift('logger', focused ? 84 : 0);
     return () => setToastLift('logger', 0);
   }, [focused]);
+
+  // Opened from a Learn more suggestion: the note arrives pre-filled, ready to send or edit.
+  useEffect(() => {
+    if (!params.note) return;
+    if (!activeId) setNote(params.note);
+    router.setParams({ note: undefined });
+  }, [params.note, activeId]);
 
   // Opened from Today's card: show that meal in the card.
   useEffect(() => {

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { type ColorValue, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
+  type SharedValue,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -25,12 +26,21 @@ const FADE_STEPS = [0, 0.25, 0.5, 0.75, 1];
  */
 const DRIFT_FROM = 1.06;
 const DRIFT_MS = 6000;
+/** The image scrolls at 65 % of the page's speed. */
+const PARALLAX = 0.35;
 
 /**
  * `drift`: the image settles slowly from 1.06× to exactly 1× (the onboarding finale), so when it
  * hands off to Today, whose hero sits at 1×, the crossfade between the two is seamless.
  */
-export function HeroBackdrop({ drift = false }: { drift?: boolean }) {
+export function HeroBackdrop({
+  drift = false,
+  scrollY,
+}: {
+  drift?: boolean;
+  /** Today's scroll offset: the image moves at a fraction of it (a gentle parallax). */
+  scrollY?: SharedValue<number>;
+}) {
   const { theme, target } = useHaloTheme();
   const [failedId, setFailedId] = useState<ThemeId | null>(null);
   const reduced = useReducedMotion();
@@ -40,7 +50,12 @@ export function HeroBackdrop({ drift = false }: { drift?: boolean }) {
       scale.set(withTiming(1, { duration: DRIFT_MS, easing: Easing.bezier(0.23, 1, 0.32, 1) }));
     }
   }, [drift, reduced, scale]);
-  const driftStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
+  const driftStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: scrollY ? Math.max(0, scrollY.get()) * PARALLAX : 0 },
+      { scale: scale.get() },
+    ],
+  }));
 
   const veilColors = theme.veil.stops.map((s) =>
     withAlpha(theme.colors.veil, s.alpha),

@@ -176,3 +176,71 @@ export function HistoryIcon(props: IconProps) {
     </Line>
   );
 }
+
+// ── Learn more metrics ──────────────────────────────────────────────────────────
+
+export function SummaryIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M4 6h10M4 11h10M4 16h7" />
+      <Path d="m18 13.5.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" />
+    </Line>
+  );
+}
+
+export function CaloriesIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M12 21c-3.6 0-6-2.4-6-5.6 0-3.3 2.6-5 3.6-8.4 1.4 1.3 2 2.7 2 4.2 1-.6 1.6-1.6 1.8-2.8 2 1.6 4.6 4 4.6 7C18 18.6 15.6 21 12 21z" />
+      <Path d="M12 21c-1.5 0-2.6-1-2.6-2.4 0-1.5 1.2-2.3 2.1-3.6.5.8 1 1.2 1.6 1.4.7.3 1.5 1 1.5 2.2 0 1.4-1.1 2.4-2.6 2.4z" />
+    </Line>
+  );
+}
+
+export function ProteinIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M16.4 4.6a4.6 4.6 0 0 1 0 6.6c-1.5 1.5-3.6 1.9-5.4 1.2l-2.8 2.8" />
+      <Path d="M16.4 4.6a4.6 4.6 0 0 0-6.6 0c-1.5 1.5-1.9 3.6-1.2 5.4l-2.8 2.8" />
+      <Path d="M5.8 12.8a1.6 1.6 0 1 0-1.5 2.7 1.6 1.6 0 1 0 2.7 1.5" />
+      <Path d="M8.2 15.2 5.8 12.8M8.2 15.2 7 17" />
+    </Line>
+  );
+}
+
+export function FatIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M12 3.5c-2.2 0-3.4 2-3.9 4.4-.4 1.7-2.6 3.2-2.6 6.4a6.5 6.5 0 0 0 13 0c0-3.2-2.2-4.7-2.6-6.4C15.4 5.5 14.2 3.5 12 3.5z" />
+      <Circle cx={12} cy={14.5} r={2.6} />
+    </Line>
+  );
+}
+
+export function CarbsIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M12 21V8" />
+      <Path d="M12 8c0-2 1-3.5 2.5-4.5.4 1.9-.4 3.6-2.5 4.5zM12 8c0-2-1-3.5-2.5-4.5C9.1 5.4 9.9 7.1 12 8z" />
+      <Path d="M12 13c1.2-1.6 2.8-2.4 4.6-2.4-.3 1.9-2 3-4.6 2.4zM12 13c-1.2-1.6-2.8-2.4-4.6-2.4.3 1.9 2 3 4.6 2.4zM12 17.5c1.2-1.6 2.8-2.4 4.6-2.4-.3 1.9-2 3-4.6 2.4zM12 17.5c-1.2-1.6-2.8-2.4-4.6-2.4.3 1.9 2 3 4.6 2.4z" />
+    </Line>
+  );
+}
+
+export function MealScoreIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M4.5 16a7.5 7.5 0 1 1 15 0M12 16l3.5-4.5" />
+      <Circle cx={12} cy={16} r={1.2} />
+    </Line>
+  );
+}
+
+export function WaterDropIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M12 3.5c3 3.6 6 7.3 6 10.8A6 6 0 0 1 6 14.3c0-3.5 3-7.2 6-10.8z" />
+      <Path d="M7.5 14.5c1.5-.9 3-.9 4.5 0s3 .9 4.5 0" />
+    </Line>
+  );
+}

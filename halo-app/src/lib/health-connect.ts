@@ -138,8 +138,8 @@ let lastRefresh = 0;
  * the latest resting HR, HRV, SpO2, blood pressure and glucose per day. Fire-and-forget and
  * throttled; silent when Health Connect is missing, and each type only when it is granted.
  */
-export async function refreshHealthData(): Promise<void> {
-  if (refreshing || Date.now() - lastRefresh < MIN_REFRESH_MS) return;
+export async function refreshHealthData(force = false): Promise<void> {
+  if (refreshing || (!force && Date.now() - lastRefresh < MIN_REFRESH_MS)) return;
   refreshing = true;
   try {
     if (!(await ready())) return;
