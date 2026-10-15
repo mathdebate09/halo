@@ -3,7 +3,7 @@
 
 import type { Tier } from '@/shared';
 
-type Slot = 'morning' | 'afternoon' | 'evening';
+type Slot = 'morning' | 'afternoon' | 'evening' | 'night';
 type Copy = { tagline: string; body: string };
 
 const TEMPLATES: Record<Tier, Record<Slot, Copy[]>> = {
@@ -38,6 +38,16 @@ const TEMPLATES: Record<Tier, Record<Slot, Copy[]>> = {
         body: 'You stayed on pace all day. Wind down and let it carry into tomorrow.',
       },
     ],
+    night: [
+      {
+        tagline: 'Rest well',
+        body: 'A good day behind you. Sleep is what carries it into tomorrow.',
+      },
+      {
+        tagline: 'Lights down',
+        body: 'You did the work today. Wind down and let your body catch up.',
+      },
+    ],
   },
   mid: {
     morning: [
@@ -68,6 +78,16 @@ const TEMPLATES: Record<Tier, Record<Slot, Copy[]>> = {
       {
         tagline: 'Wind down well',
         body: 'Something nourishing and an early night will do the most now.',
+      },
+    ],
+    night: [
+      {
+        tagline: 'Time to rest',
+        body: 'Whatever today was, sleep is the best next step. Tomorrow starts fresh.',
+      },
+      {
+        tagline: 'Ease off',
+        body: 'Put the screen down soon. A good night’s sleep does more than anything else now.',
       },
     ],
   },
@@ -102,14 +122,27 @@ const TEMPLATES: Record<Tier, Record<Slot, Copy[]>> = {
         body: 'Some days are like this. Eat well tonight and rest; tomorrow is new.',
       },
     ],
+    night: [
+      {
+        tagline: 'Rest up',
+        body: 'Today is done. A good night’s sleep is the kindest thing you can do now.',
+      },
+      {
+        tagline: 'Let it go',
+        body: 'Tomorrow is a clean slate. Rest is all that’s needed tonight.',
+      },
+    ],
   },
 };
 
 const PROVISIONAL_BODY =
   'Go about your day. Your score sharpens as meals, water and steps come in.';
+const PROVISIONAL_NIGHT = 'Rest up. Tomorrow’s score builds as meals, water and steps come in.';
 
+// Late night (from 22:00 until 05:00) is still the previous day under the 4 am rollover: no
+// breakfast advice at 2 am.
 const slotFor = (hour: number): Slot =>
-  hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+  hour < 5 || hour >= 22 ? 'night' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
 
 function hash(text: string) {
   let h = 0;
@@ -121,5 +154,6 @@ export function todayCopy(tier: Tier, day: string, hour: number, provisional: bo
   const slot = slotFor(hour);
   const options = TEMPLATES[tier][slot];
   const pick = options[hash(`${day}:${tier}:${slot}`) % options.length]!;
-  return provisional ? { tagline: pick.tagline, body: PROVISIONAL_BODY } : pick;
+  if (!provisional) return pick;
+  return { tagline: pick.tagline, body: slot === 'night' ? PROVISIONAL_NIGHT : PROVISIONAL_BODY };
 }

@@ -15,9 +15,8 @@ import {
 } from '@/components/icons';
 import { PressScale } from '@/components/press-scale';
 import { Sheet } from '@/components/sheet';
-import { showToast } from '@/components/toast';
 import { addWater, DEFAULT_GLASS_ML } from '@/lib/water';
-import { discardMeal, saveMeal } from '@/meals/capture';
+import { saveMeal } from '@/meals/capture';
 import { MealCamera } from '@/meals/meal-camera';
 import { useHaloTheme } from '@/theme/theme-provider';
 
@@ -41,10 +40,9 @@ export default function LogModal() {
 
   const logMeal = () => {
     if (!canLog) return;
-    const saved = saveMeal({ photoUri: photo, note });
+    saveMeal({ photoUri: photo, note });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.back();
-    showToast('Meal saved', { label: 'Undo', onPress: () => discardMeal(saved) });
   };
 
   const addCustom = (ml: number) => {

@@ -4,7 +4,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
-import { deleteRecord, upsertRecord } from '@/db/mutate';
+import { upsertRecord } from '@/db/mutate';
 import { dayKey, hourOfDay, mealTypeAt } from '@/shared';
 
 import { requestAnalysis } from './analysis';
@@ -56,16 +56,4 @@ export function saveMeal({
   });
   requestAnalysis();
   return { id, photoUri: kept };
-}
-
-/** Undo for a just-saved meal: tombstones it and removes the local photo. */
-export function discardMeal(meal: SavedMeal) {
-  deleteRecord('meal', meal.id);
-  if (meal.photoUri) {
-    try {
-      new File(meal.photoUri).delete();
-    } catch {
-      // Already gone.
-    }
-  }
 }
