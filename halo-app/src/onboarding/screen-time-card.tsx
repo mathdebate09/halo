@@ -43,7 +43,7 @@ export function ScreenTimeCard() {
           accessibilityRole="button"
           accessibilityHint="Opens Usage access in Settings"
           onPress={openUsageAccess}
-          className="rounded-pill bg-glass/10 px-4 py-2 active:bg-glass/20">
+          className="rounded-pill bg-glass/10 px-4 py-2">
           <Text className="font-sans-medium text-[15px] text-text">Allow</Text>
         </PressScale>
       )}

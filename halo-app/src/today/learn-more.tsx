@@ -119,7 +119,7 @@ export function LearnMore({ scores, armed }: { scores: TodayScores; armed: boole
             <PressScale
               accessibilityRole="button"
               onPress={() => runAction(next.action, next.briefId)}
-              className="rounded-pill bg-glass/10 px-5 py-2.5 active:bg-glass/20">
+              className="rounded-pill bg-glass/10 px-5 py-2.5">
               <Text className="font-sans-medium text-[15px] text-text">{next.text}</Text>
             </PressScale>
           </Animated.View>
