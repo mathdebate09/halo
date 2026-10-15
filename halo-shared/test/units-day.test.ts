@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { addDays, dayKey, dayStart, hourOfDay } from '../src/day';
+import { addDays, dayKey, dayStart, formatClock, hourOfDay } from '../src/day';
 import {
   cmToFtIn,
   defaultUnits,
@@ -51,5 +51,21 @@ describe('day key (4 am rollover)', () => {
   });
   it('reports fractional hours', () => {
     expect(hourOfDay(new Date(2026, 9, 14, 13, 30))).toBe(13.5);
+  });
+});
+
+describe('formatClock', () => {
+  it('follows a 24-hour clock', () => {
+    expect([0, 9, 13.5, 22.5, 23.99].map((h) => formatClock(h))).toEqual(['00:00', '09:00', '13:30', '22:30', '23:59']);
+  });
+  it('uses one number and am/pm otherwise, minutes only when there are some', () => {
+    expect([0, 9, 12, 13.5, 22.5, 24.5].map((h) => formatClock(h, false))).toEqual([
+      '12 am',
+      '9 am',
+      '12 pm',
+      '1:30 pm',
+      '10:30 pm',
+      '12:30 am',
+    ]);
   });
 });

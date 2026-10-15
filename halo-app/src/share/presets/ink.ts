@@ -4,6 +4,8 @@
 
 import { StyleSheet, type TextStyle } from 'react-native';
 
+import { formatTime } from '@/lib/clock';
+
 import type { ShareSnapshot } from '../snapshot';
 
 export type Variant = 'light' | 'dark' | 'accent';
@@ -67,7 +69,8 @@ export function ink(variant: Variant, snapshot: ShareSnapshot): Ink {
 
 export const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
 const pad2 = (n: number) => String(n).padStart(2, '0');
-export const clock = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+/** The card's time on the device's clock ("18:04" or "6:04 pm"). */
+export const clock = (d: Date) => formatTime(d);
 /** The share day (a dayKey, 4 am rollover) as its parts. */
 export function dayParts(day: string) {
   const [y, m, d] = day.split('-').map(Number) as [number, number, number];

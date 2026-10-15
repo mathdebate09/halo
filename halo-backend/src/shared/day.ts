@@ -29,3 +29,16 @@ export function addDays(key: string, days: number): string {
 /** Wall-clock hour as a fraction (13:30 → 13.5). */
 export const hourOfDay = (date: Date) =>
   date.getHours() + date.getMinutes() / 60 + date.getSeconds() / 3600;
+
+/**
+ * A clock time the way the device shows it: "17:00" / "22:30" on a 24-hour clock, otherwise
+ * "5 pm" / "10:30 pm" (minutes only when there are some).
+ */
+export function formatClock(hour: number, h24 = true): string {
+  const total = ((Math.round(hour * 60) % 1440) + 1440) % 1440;
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h24) return `${pad(h)}:${pad(m)}`;
+  const suffix = h < 12 ? 'am' : 'pm';
+  return `${h % 12 || 12}${m ? `:${pad(m)}` : ''} ${suffix}`;
+}

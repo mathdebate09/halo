@@ -10,6 +10,7 @@ import { useMMKVNumber } from 'react-native-mmkv';
 import { useLearned, windowsOn } from '@/assistant/learned';
 import { db } from '@/db/client';
 import { hcDaily, meals, water } from '@/db/schema';
+import { useClock24 } from '@/lib/clock';
 import { refreshHealthData } from '@/lib/health-connect';
 import { kv } from '@/lib/kv';
 import { usePlan, useProfile } from '@/lib/plan';
@@ -98,6 +99,7 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
   const profile = useProfile();
   const { setThemeId } = useHaloTheme();
   const [override] = useMMKVNumber(DEV_SCORE_OVERRIDE_KEY, kv);
+  const clock24 = useClock24();
   // The user's own meal times (weekday or weekend) once learned, else the defaults.
   const windows = windowsOn(day, useLearned());
 
@@ -240,6 +242,7 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
       sleepHours: todayRow?.sleepMin == null ? null : todayRow.sleepMin / 60,
       sleepNeedHours: 7.5,
       dietScore: diet.value,
+      clock24,
     },
     intake: {
       kcal: mealRows.reduce((a, m) => a + num(m.kcal), 0),

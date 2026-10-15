@@ -4,6 +4,7 @@
 // meals, when they wake and so when they should go to bed. Pure functions over local history;
 // the app recomputes them on foreground and after logs.
 
+import { formatClock } from './day.js';
 import { DEFAULT_MEAL_WINDOWS, type MealType, type MealWindows } from './scoring.js';
 import { clamp } from './units.js';
 
@@ -171,9 +172,6 @@ export function inSpan(hour: number, start: number, end: number): boolean {
 export const inQuietHours = (hour: number, bedtime: Bedtime, wakeHour: number) =>
   inSpan(hour, bedtime.hour, wakeHour);
 
-/** "13:00", "08:30": a learned time, rounded to the half hour so it reads like a habit. */
-export function clockLabel(hour: number): string {
-  const half = Math.round(wrapHour(hour) * 2) / 2;
-  const h = Math.floor(half) % 24;
-  return `${String(h).padStart(2, '0')}:${half % 1 ? '30' : '00'}`;
-}
+/** A learned time ("13:00", "1 pm"), rounded to the half hour so it reads like a habit. */
+export const clockLabel = (hour: number, h24 = true) =>
+  formatClock(Math.round(wrapHour(hour) * 2) / 2, h24);

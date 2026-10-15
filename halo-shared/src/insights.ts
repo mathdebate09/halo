@@ -2,6 +2,7 @@
 // / Why. Built from local facts as structured segments ({ t } text, { m, v } a tappable metric
 // chip), the same shape the AI will return in chunk 16, so the UI doesn't care who wrote it.
 
+import { formatClock } from './day';
 import type { Goal } from './plan';
 import { DEFAULT_MEAL_WINDOWS, type MealType } from './scoring';
 import { round } from './units';
@@ -75,6 +76,8 @@ export type DayFacts = {
   sleepHours: number | null;
   sleepNeedHours: number;
   dietScore: number;
+  /** The device uses a 24-hour clock (default) rather than am/pm. */
+  clock24?: boolean;
 };
 
 /** Below this share of the day there's no pace to speak of yet. */
@@ -92,20 +95,25 @@ export const roundGap = (n: number, unit: string) => {
 };
 
 /** The hour, not the minute: text that changes every minute would replay its reveal. */
-function clock(hour: number) {
-  return `${String(Math.floor(hour)).padStart(2, '0')}:00`;
-}
+const clock = (hour: number, h24?: boolean) => formatClock(Math.floor(hour), h24);
 
 /** "About 40 g behind where you'd usually be by 13:00", or on pace / ahead / too early. */
-function paceLine(actual: number, target: number, share: number, unit: string, hour: number) {
+function paceLine(
+  actual: number,
+  target: number,
+  share: number,
+  unit: string,
+  hour: number,
+  h24?: boolean,
+) {
   if (share < EARLY) return 'Too early to judge. The day has barely started.';
   const expected = target * share;
   const diff = actual - expected;
   const show = `${fmt(roundGap(Math.abs(diff), unit))} ${unit}`;
-  if (Math.abs(diff) <= expected * ON_PACE) return `Right on pace for ${clock(hour)}.`;
+  if (Math.abs(diff) <= expected * ON_PACE) return `Right on pace for ${clock(hour, h24)}.`;
   return diff < 0
-    ? `About ${show} behind where you'd usually be by ${clock(hour)}.`
-    : `About ${show} ahead of where you'd usually be by ${clock(hour)}.`;
+    ? `About ${show} behind where you'd usually be by ${clock(hour, h24)}.`
+    : `About ${show} ahead of where you'd usually be by ${clock(hour, h24)}.`;
 }
 
 /**
@@ -167,7 +175,7 @@ function panelFor(tab: SummaryTab, f: DayFacts): Omit<Panel, 'nudge'> {
         tab,
         hasData: true,
         done: { value: intake.kcal, target: targets.kcal, unit: 'kcal' },
-        pace: paceLine(intake.kcal, targets.kcal, due, 'kcal', hour),
+        pace: paceLine(intake.kcal, targets.kcal, due, 'kcal', hour, f.clock24),
         next: caloriesNext(f),
         why: GOAL_WHY[f.goal],
       };
@@ -176,7 +184,7 @@ function panelFor(tab: SummaryTab, f: DayFacts): Omit<Panel, 'nudge'> {
         tab,
         hasData: true,
         done: { value: intake.proteinG, target: targets.proteinG, unit: 'g' },
-        pace: paceLine(intake.proteinG, targets.proteinG, due, 'g', hour),
+        pace: paceLine(intake.proteinG, targets.proteinG, due, 'g', hour, f.clock24),
         next: macroNext(f, 'proteinG'),
         why:
           f.goal === 'gain'
@@ -188,7 +196,7 @@ function panelFor(tab: SummaryTab, f: DayFacts): Omit<Panel, 'nudge'> {
         tab,
         hasData: true,
         done: { value: intake.carbsG, target: targets.carbsG, unit: 'g' },
-        pace: paceLine(intake.carbsG, targets.carbsG, due, 'g', hour),
+        pace: paceLine(intake.carbsG, targets.carbsG, due, 'g', hour, f.clock24),
         next: macroNext(f, 'carbsG'),
         why: 'Carbs fuel your steps and workouts.',
       };
@@ -197,7 +205,7 @@ function panelFor(tab: SummaryTab, f: DayFacts): Omit<Panel, 'nudge'> {
         tab,
         hasData: true,
         done: { value: intake.fatG, target: targets.fatG, unit: 'g' },
-        pace: paceLine(intake.fatG, targets.fatG, due, 'g', hour),
+        pace: paceLine(intake.fatG, targets.fatG, due, 'g', hour, f.clock24),
         next: macroNext(f, 'fatG'),
         why: 'Fat keeps meals satisfying and helps you absorb vitamins.',
       };
@@ -207,7 +215,7 @@ function panelFor(tab: SummaryTab, f: DayFacts): Omit<Panel, 'nudge'> {
         tab,
         hasData: true,
         done: { value: f.waterMl, target: targets.waterMl, unit: 'ml' },
-        pace: paceLine(f.waterMl, targets.waterMl, f.dayFraction, 'ml', hour),
+        pace: paceLine(f.waterMl, targets.waterMl, f.dayFraction, 'ml', hour, f.clock24),
         next: done
           ? { text: "You've had your water for today.", action: null }
           : { text: 'Add a glass', action: { kind: 'water', ml: 250 } },
@@ -230,7 +238,7 @@ function panelFor(tab: SummaryTab, f: DayFacts): Omit<Panel, 'nudge'> {
         tab,
         hasData: true,
         done: { value: f.steps, target: targets.steps, unit: 'steps' },
-        pace: paceLine(f.steps, targets.steps, f.dayFraction, 'steps', hour),
+        pace: paceLine(f.steps, targets.steps, f.dayFraction, 'steps', hour, f.clock24),
         next: {
           text:
             left > 300

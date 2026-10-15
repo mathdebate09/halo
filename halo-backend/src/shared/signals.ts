@@ -4,6 +4,7 @@
 // Halo has learned about the user. Each rule only says what it sees; none of them decides what
 // reaches the user. That is the PA's job (pa.ts).
 
+import { formatClock } from './day.js';
 import {
   behind,
   type DayFacts,
@@ -111,7 +112,9 @@ const TAIL = 0.5;
 /** A missed meal is only worth asking about for a few hours. */
 const MISSED_FOR = 5;
 
-const clock = (hour: number) => `${String(Math.floor(hour)).padStart(2, '0')}:00`;
+
+/** This hour on the device's clock ("15:00" or "3 pm"): the hour, so the words hold all hour. */
+const hourLabel = (ctx: PaContext) => formatClock(Math.floor(ctx.hour), ctx.facts.clock24);
 
 /** Epoch ms of the next time the wall clock reads `hour` (today, or after midnight). */
 export function atHour(ctx: Pick<PaContext, 'now' | 'hour'>, hour: number): number {
@@ -161,7 +164,7 @@ function mealWindow(ctx: PaContext): Signal | null {
       facts: {
         meal: type,
         status: 'open',
-        at: clockLabel(usualHour(windows, type)),
+        at: clockLabel(usualHour(windows, type), ctx.facts.clock24),
         missed: missed.at(-1) ?? '',
       },
     };
@@ -183,7 +186,7 @@ function mealWindow(ctx: PaContext): Signal | null {
       meal: last,
       status: 'missed',
       next: following ?? '',
-      nextAt: following ? clockLabel(usualHour(windows, following)) : '',
+      nextAt: following ? clockLabel(usualHour(windows, following), ctx.facts.clock24) : '',
     },
   };
 }
@@ -206,7 +209,7 @@ function proteinPace(ctx: PaContext): Signal | null {
     tab: 'protein',
     facts: {
       gap: roundGap(gap, 'g'),
-      at: clock(ctx.hour),
+      at: hourLabel(ctx),
       dinnerLogged: f.loggedTypes.includes('dinner') ? 1 : 0,
     },
   };
@@ -226,7 +229,7 @@ function caloriePace(ctx: PaContext): Signal | null {
     action: { kind: 'log', note: mealNote(ctx, next) },
     expiresAt: atHour(ctx, bedtimeOf(ctx).hour - 0.5),
     tab: 'calories',
-    facts: { gap: roundGap(gap, 'kcal'), at: clock(ctx.hour), next },
+    facts: { gap: roundGap(gap, 'kcal'), at: hourLabel(ctx), next },
   };
 }
 
@@ -261,7 +264,7 @@ function waterPace(ctx: PaContext): Signal | null {
     action: { kind: 'water', ml: 250 },
     expiresAt: atHour(ctx, bedtimeOf(ctx).hour - 0.5),
     tab: 'water',
-    facts: { gap: roundGap(gap, 'ml'), at: clock(ctx.hour) },
+    facts: { gap: roundGap(gap, 'ml'), at: hourLabel(ctx) },
   };
 }
 
@@ -283,7 +286,7 @@ function weighIn(ctx: PaContext, due: boolean): Signal | null {
 function sleep(ctx: PaContext): Signal | null {
   const { facts: f, hour } = ctx;
   const bed = bedtimeOf(ctx);
-  const at = clockLabel(bed.hour);
+  const at = clockLabel(bed.hour, f.clock24);
   const slept = f.sleepHours == null ? '' : round(f.sleepHours, 1);
   if (inSpan(hour, bed.hour - 1.5, bed.hour + 2)) {
     return {

@@ -19,6 +19,7 @@ import { PressScale } from '@/components/press-scale';
 import { ThemedScreen } from '@/components/themed-screen';
 import { db } from '@/db/client';
 import { meals, water } from '@/db/schema';
+import { formatTime } from '@/lib/clock';
 import { dayLabel } from '@/lib/day-label';
 import { usePlan } from '@/lib/plan';
 import { TYPE_LABELS } from '@/meals/editor';
@@ -158,10 +159,7 @@ function Bar({
 
 function MealRow({ meal }: { meal: Meal }) {
   const { theme } = useHaloTheme();
-  const time = new Date(meal.eatenAt).toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  const time = formatTime(new Date(meal.eatenAt));
   const status =
     meal.status === 'analysing'
       ? 'Analysing…'

@@ -195,6 +195,26 @@ describe('vetting and bundling', () => {
   });
 });
 
+describe('device clock', () => {
+  it('writes times in am/pm when the device uses a 12-hour clock', () => {
+    const b = brief(
+      ctx(22, 30, {}, {
+        clock24: false,
+        sleepHours: 5.6,
+        mealsLogged: 2,
+        loggedTypes: ['breakfast', 'lunch'],
+        due: 0.95,
+        dayFraction: 1,
+      }),
+    );
+    expect(b.insight.copy.tagline).toBe('Bed by 10:30 pm');
+    const missed = brief(
+      ctx(11, 0, { windows: learned }, { clock24: false, due: 0.2, dayFraction: 0.29 }),
+    );
+    expect(missed.insight.copy.line).toBe('If you did, log it now. Lunch is usually around 1 pm.');
+  });
+});
+
 describe('next meal', () => {
   it('suggests the meal still ahead, not one whose time has passed', () => {
     const b = brief(
