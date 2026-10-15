@@ -444,12 +444,19 @@ export function vitalsReport(input: VitalsInput): VitalsReport {
  */
 export function pickBands(areas: readonly Area[], held?: readonly AreaKey[] | null): AreaKey[] {
   const keys = new Set(areas.map((a) => a.key));
-  if (held && held.length === Math.min(3, areas.length) && held.every((k) => keys.has(k))) return [...held];
   const byPriority = [...areas].sort((a, b) => AREA_PRIORITY.indexOf(a.key) - AREA_PRIORITY.indexOf(b.key));
   const real = byPriority.filter((a) => a.source !== 'assumed');
-  const picked: AreaKey[] = [];
   const weakest = real.reduce<Area | null>((w, a) => (w == null || a.score < w.score ? a : w), null);
-  if (weakest?.state === 'needs_care') picked.push(weakest.key);
+  const mustShow = weakest?.state === 'needs_care' ? weakest.key : null;
+  // The hold gives way when an area that needs care (with data) isn't on it: the hero never hides it.
+  const holds =
+    held &&
+    held.length === Math.min(3, areas.length) &&
+    held.every((k) => keys.has(k)) &&
+    (mustShow == null || held.includes(mustShow));
+  if (holds) return [...held];
+  const picked: AreaKey[] = [];
+  if (mustShow) picked.push(mustShow);
   for (const a of [...real, ...byPriority.filter((x) => x.source === 'assumed')]) {
     if (picked.length === 3) break;
     if (!picked.includes(a.key)) picked.push(a.key);
@@ -545,10 +552,34 @@ export type VitalRow = {
 /** A measured-only metric with no reading yet: shown as an ask, never estimated. */
 export type VitalStub = { key: MetricKey; area: AreaKey; action: 'add' | 'connect' | 'usage_access' };
 
-export function rowStateLabel(state: RowState, ownBand: boolean): string {
-  if (state === 'strong') return 'Strong';
-  if (state === 'in_range') return 'In range';
-  return ownBand ? 'Outside your usual range' : 'Outside the typical range';
+/**
+ * A row's state word. "Outside your usual range" only when the value really is past the user's own
+ * band; a low score inside it is outside the typical range instead.
+ */
+export function rowStateLabel(row: Pick<VitalRow, 'state' | 'value' | 'band'>): string {
+  if (row.state === 'strong') return 'Strong';
+  if (row.state === 'in_range') return 'In range';
+  const b = row.band;
+  const pastOwn = b != null && b.own && (row.value < b.lo || row.value > b.hi);
+  return pastOwn ? 'Outside your usual range' : 'Outside the typical range';
+}
+
+/** Which way is better for a reading; the rest are best inside their band. */
+const HIGHER_BETTER = new Set<VitalRow['key']>(['hrv', 'spo2', 'week_activity', 'exercise_week', 'vo2max']);
+const LOWER_BETTER = new Set<VitalRow['key']>(['resting_hr', 'screen_late', 'screen_daily']);
+/** Their state comes from the trend toward the goal, not from the band. */
+const TREND_ROWS = new Set<VitalRow['key']>(['weight_trend', 'body_fat']);
+
+/**
+ * A row past its band on the worse side reads as outside, whatever its score: the state word
+ * and the slider must never disagree. Past the band on the better side keeps its score's word.
+ */
+export function bandedState(row: Pick<VitalRow, 'key' | 'value' | 'state' | 'band'>): RowState {
+  if (!row.band || TREND_ROWS.has(row.key)) return row.state;
+  const below = row.value < row.band.lo;
+  const above = row.value > row.band.hi;
+  const worse = HIGHER_BETTER.has(row.key) ? below : LOWER_BETTER.has(row.key) ? above : below || above;
+  return worse ? 'outside' : row.state;
 }
 
 export function rowState(score: number): RowState {
@@ -745,5 +776,5 @@ export function vitalsDetail(input: VitalsInput, report: VitalsReport): VitalsDe
       day: fat.day,
     });
   }
-  return { rows, stubs };
+  return { rows: rows.map((r) => ({ ...r, state: bandedState(r) })), stubs };
 }

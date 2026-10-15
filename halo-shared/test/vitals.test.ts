@@ -9,6 +9,7 @@ import {
   type Area,
   type AreaKey,
   areaState,
+  bandedState,
   bandFor,
   ON_TRACK_STEP,
   pickBands,
@@ -159,7 +160,22 @@ describe('states, bands and words', () => {
     expect(bandFor([60, 62, 64, 66], [50, 80])).toEqual({ lo: 61.5, hi: 64.5, own: true });
     expect(bandFor([60], [50, 80])).toEqual({ lo: 50, hi: 80, own: false });
     expect(bandFor([], null)).toBeNull();
-    expect(rowStateLabel('outside', true)).toBe('Outside your usual range');
+    const own = { lo: 453, hi: 641, own: true };
+    expect(rowStateLabel({ state: 'outside', value: 700, band: own })).toBe('Outside your usual range');
+    // A low score inside the user's own band is outside the typical range, not their usual one.
+    expect(rowStateLabel({ state: 'outside', value: 605, band: own })).toBe('Outside the typical range');
+  });
+
+  it('never lets the state word disagree with the slider', () => {
+    const band = { lo: 9.4, hi: 10.5, own: true };
+    // Short night under the usual band: outside, even though the score against need is fine.
+    expect(bandedState({ key: 'sleep', value: 6.6, state: 'in_range', band })).toBe('outside');
+    // Past the band on the better side keeps its word.
+    expect(bandedState({ key: 'exercise_week', value: 397, state: 'strong', band: { lo: 150, hi: 300, own: false } })).toBe('strong');
+    expect(bandedState({ key: 'resting_hr', value: 52, state: 'strong', band: { lo: 58, hi: 64, own: true } })).toBe('strong');
+    expect(bandedState({ key: 'screen_daily', value: 605, state: 'in_range', band: { lo: 453, hi: 541, own: true } })).toBe('outside');
+    // Weight follows its trend, not the band.
+    expect(bandedState({ key: 'weight_trend', value: 78, state: 'strong', band: { lo: 79, hi: 80, own: true } })).toBe('strong');
   });
 
   it('places VO2 max against age and sex', () => {
@@ -220,8 +236,13 @@ describe('pickBands', () => {
     expect(pickBands(areas)).toEqual(['sleep', 'screen', 'body']);
   });
 
+  it('drops a held pick when an area that needs care isn’t on it', () => {
+    const areas = [fake('sleep', 74), fake('movement', 84), fake('screen', 18), fake('body', 70, 'assumed')];
+    expect(pickBands(areas, ['sleep', 'movement', 'body'])).toEqual(['sleep', 'movement', 'screen']);
+  });
+
   it('keeps a held pick for the day while its areas exist', () => {
-    const areas = [fake('sleep', 85), fake('heart', 30), fake('movement', 70), fake('screen', 75)];
+    const areas = [fake('sleep', 85), fake('heart', 65), fake('movement', 70), fake('screen', 75)];
     expect(pickBands(areas, ['sleep', 'movement', 'screen'])).toEqual(['sleep', 'movement', 'screen']);
     expect(pickBands(areas.filter((a) => a.key !== 'screen'), ['sleep', 'movement', 'screen'])).toEqual([
       'sleep',
@@ -257,7 +278,9 @@ describe('vitalsHeadline', () => {
       ...Object.values(AREA_STEPS),
       ...Object.values(AREA_STATE_LABELS),
       ON_TRACK_STEP,
-      ...(['strong', 'in_range', 'outside'] as const).flatMap((s) => [rowStateLabel(s, true), rowStateLabel(s, false)]),
+      ...(['strong', 'in_range', 'outside'] as const).flatMap((state) =>
+        [0, 50].map((value) => rowStateLabel({ state, value, band: { lo: 10, hi: 20, own: true } })),
+      ),
     ]);
     const scores = [30, 65, 90];
     for (const a of keys) {

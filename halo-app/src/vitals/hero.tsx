@@ -45,9 +45,10 @@ export function VitalsHero({
         </Text>
       </View>
 
-      <View className="mt-6">
-        <Bands areas={shown} width={width} height={Math.round(height * 0.34)} />
-        <View className="mt-1 flex-row justify-between px-5">
+      <View className="-mt-4">
+        <Bands areas={shown} width={width} height={Math.round(height * 0.38)} />
+        {/* Close under the ribbons, as in Oura. */}
+        <View className="mt-2 flex-row justify-between px-5">
           <Text
             className="font-sans-medium text-[13px] tracking-[1.5px]"
             style={{ color: theme.colors.opportunity }}>
@@ -65,7 +66,7 @@ export function VitalsHero({
 
       <Animated.View
         entering={FadeIn.duration(700).delay(500).easing(EASE_OUT)}
-        className="px-5"
+        className="mt-10 px-5"
         style={{ paddingBottom: bottom + 24 }}>
         <Text className="font-sans-medium text-[13px] tracking-[1px] text-muted">
           {`VITALS ${report.score.value}${report.score.dataBacked ? '' : ' · EARLY READ'}`}
