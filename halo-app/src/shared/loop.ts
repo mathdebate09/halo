@@ -62,6 +62,8 @@ export function isResolved(record: InsightRecord, ctx: PaContext): boolean {
       return !behind(f.waterMl, f.targets.waterMl, f.dayFraction);
     case 'weigh_in':
       return ctx.weighedToday;
+    case 'wake_ask':
+      return !!ctx.wakeAsked;
     default:
       // Calories over can't un-happen; sleep is judged by the next night.
       return false;

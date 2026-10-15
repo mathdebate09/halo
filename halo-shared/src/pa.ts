@@ -21,13 +21,15 @@ export const HOLD_MARGIN = 15;
 /** Yesterday's outcome leads the brief until this hour. */
 const OUTCOME_UNTIL = 11;
 
-const FOOD: readonly InsightKind[] = [
+/** What only makes sense in the daytime: food, water, the scale and the wake-time ask. */
+const DAYTIME: readonly InsightKind[] = [
   'meal_window',
   'protein_pace',
   'calorie_pace',
   'calorie_over',
   'water_pace',
   'weigh_in',
+  'wake_ask',
 ];
 
 export type Dropped = { id: string; type: InsightKind; reason: string };
@@ -63,7 +65,7 @@ function vet(ctx: PaContext, signals: Signal[]): { kept: Signal[]; dropped: Drop
   const find = (type: InsightKind) => kept.find((s) => s.type === type);
 
   // Can't be acted on now: bedtime is close (or they're asleep).
-  if (isLate(ctx)) drop((s) => FOOD.includes(s.type), 'too late in the day for this');
+  if (isLate(ctx)) drop((s) => DAYTIME.includes(s.type), 'too late in the day for this');
 
   // The same thing said twice: one wins.
   const meal = find('meal_window');

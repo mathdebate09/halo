@@ -104,6 +104,9 @@ describe('templates are valid rewordings of themselves (apart from being unchang
     weigh_in: {},
     sleep_debt: { at: '22:30', slept: 5.6, need: 7.5 },
     bedtime: { at: '22:30', slept: 5.6, need: 7.5, pulled: 1 },
+    wake_ask: {},
+    weekly_review: { avg: 74, days: 7, delta: 6, trend: 'down' },
+    quiet_days: {},
     on_track: {},
   };
   for (const [type, f] of Object.entries(facts)) {

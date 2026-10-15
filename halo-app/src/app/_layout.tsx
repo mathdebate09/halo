@@ -46,6 +46,14 @@ function RootNavigator() {
             }}
           />
           <Stack.Screen
+            name="wake-time"
+            options={{
+              presentation: 'transparentModal',
+              animation: 'fade',
+              contentStyle: { backgroundColor: 'transparent' },
+            }}
+          />
+          <Stack.Screen
             name="meal/[id]"
             options={{
               presentation: 'transparentModal',

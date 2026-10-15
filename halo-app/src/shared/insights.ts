@@ -40,6 +40,7 @@ export type NextAction =
   | { kind: 'log'; note: string }
   | { kind: 'connect' }
   | { kind: 'weigh' }
+  | { kind: 'ask_wake' }
   | null;
 
 export type Panel = {

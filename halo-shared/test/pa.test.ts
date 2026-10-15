@@ -195,6 +195,29 @@ describe('vetting and bundling', () => {
   });
 });
 
+describe('wake-time ask', () => {
+  const base = (over: Partial<PaContext> = {}) =>
+    ctx(10, 0, { wake: { value: 7, source: 'assumed' }, daysSinceInstall: 2, ...over }, {
+      mealsLogged: 1,
+      loggedTypes: ['breakfast'],
+      due: 0.25,
+      dayFraction: 0.2,
+      waterMl: 600,
+      intake: { kcal: 500, proteinG: 35, carbsG: 60, fatG: 15 },
+    });
+  it('asks once from day 3 while the wake time is a guess', () => {
+    const b = brief(base());
+    expect(b.insight.type).toBe('wake_ask');
+    expect(b.insight.action).toEqual({ kind: 'ask_wake' });
+    expect(b.insight.copy.actionLabel).toBe('Set wake time');
+  });
+  it('stays quiet before day 3, once answered, or when Health Connect knows', () => {
+    expect(brief(base({ daysSinceInstall: 1 })).insight.type).not.toBe('wake_ask');
+    expect(brief(base({ wakeAsked: true })).insight.type).not.toBe('wake_ask');
+    expect(brief(base({ wake: { value: 7, source: 'measured' } })).insight.type).not.toBe('wake_ask');
+  });
+});
+
 describe('device clock', () => {
   it('writes times in am/pm when the device uses a 12-hour clock', () => {
     const b = brief(

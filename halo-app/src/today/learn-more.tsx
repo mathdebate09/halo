@@ -1,4 +1,4 @@
-import { router, useIsFocused } from 'expo-router';
+import { useIsFocused } from 'expo-router';
 import { type ComponentType, type ReactNode, useEffect, useState } from 'react';
 import { Text, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, FadeIn } from 'react-native-reanimated';
@@ -12,14 +12,11 @@ import {
   SummaryIcon,
   WaterDropIcon,
 } from '@/components/icons';
+import { runAction } from '@/assistant/actions';
 import { useAssistant } from '@/assistant/assistant';
-import { markActed } from '@/assistant/loop-store';
 import { useBriefWords } from '@/assistant/phrasing';
 import { PressScale } from '@/components/press-scale';
-import { showToast } from '@/components/toast';
-import { connectHealthConnect, refreshHealthData } from '@/lib/health-connect';
-import { addWater } from '@/lib/water';
-import { daySummary, type NextAction, type SummaryTab, summaryPanel, TAB_LABELS } from '@/shared';
+import { daySummary, type SummaryTab, summaryPanel, TAB_LABELS } from '@/shared';
 import { useHaloTheme } from '@/theme/theme-provider';
 import { withAlpha } from '@/theme/themes';
 
@@ -121,10 +118,7 @@ export function LearnMore({ scores, armed }: { scores: TodayScores; armed: boole
             className="mt-4 items-center">
             <PressScale
               accessibilityRole="button"
-              onPress={() => {
-                if (next.briefId) markActed(next.briefId);
-                runNext(next.action);
-              }}
+              onPress={() => runAction(next.action, next.briefId)}
               className="rounded-pill bg-glass/10 px-5 py-2.5 active:bg-glass/20">
               <Text className="font-sans-medium text-[15px] text-text">{next.text}</Text>
             </PressScale>
@@ -148,23 +142,4 @@ function Label({ icon, text }: { icon: ReactNode; text: string }) {
       </Text>
     </View>
   );
-}
-
-/**
- * Next acts where it can (water), pre-fills the logger for food, opens the weigh-in sheet at the
- * last weight, and connects missing sources.
- */
-async function runNext(action: NextAction) {
-  if (!action) return;
-  if (action.kind === 'water') {
-    addWater(action.ml);
-    showToast(`${action.ml} ml water added`);
-  } else if (action.kind === 'log') {
-    router.navigate({ pathname: '/log', params: { note: action.note } });
-  } else if (action.kind === 'weigh') {
-    router.push('/weigh-in');
-  } else {
-    await connectHealthConnect();
-    refreshHealthData(true);
-  }
 }

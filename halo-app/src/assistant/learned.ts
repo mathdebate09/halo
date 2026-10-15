@@ -29,6 +29,8 @@ const LEARNED_KEY = 'assistant.learned';
 const FIRST_OPENS_KEY = 'assistant.firstOpens';
 /** The user's answer to the day-3 wake-time ask (chunk 17b), as an hour. */
 export const WAKE_ASKED_KEY = 'assistant.wakeAsked';
+/** Set once the wake-time ask is answered or waved off: it's asked only once. */
+export const WAKE_ASK_DONE_KEY = 'assistant.wakeAskDone';
 const INSTALL_DAY_KEY = 'assistant.installDay';
 
 const LOOKBACK_DAYS = 28;

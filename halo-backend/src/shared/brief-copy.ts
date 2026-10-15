@@ -85,6 +85,28 @@ const COPY: Record<Signal['type'], (s: Signal) => InsightCopy> = {
       : `Start winding down now to get your ${f.need} h.`,
     actionLabel: null,
   }),
+  wake_ask: () => ({
+    tagline: 'When do you wake?',
+    line: 'One answer sets your weigh-in and bedtime.',
+    actionLabel: 'Set wake time',
+  }),
+  weekly_review: ({ facts: f }) => ({
+    tagline: 'Your week',
+    line:
+      f.trend === 'up'
+        ? `You averaged ${f.avg} over ${f.days} days, ${f.delta} up on last week.`
+        : f.trend === 'down'
+          ? `You averaged ${f.avg} over ${f.days} days, ${f.delta} below last week. A steady Monday turns it.`
+          : f.trend === 'level'
+            ? `You averaged ${f.avg} over ${f.days} days, level with last week.`
+            : `You averaged ${f.avg} over ${f.days} days. Next week has a number to beat.`,
+    actionLabel: null,
+  }),
+  quiet_days: () => ({
+    tagline: 'Pick it back up',
+    line: 'One photo of your next meal gets the day going again.',
+    actionLabel: 'Log a meal',
+  }),
   on_track: () => ({
     tagline: 'On track',
     line: 'Nothing needs you right now.',

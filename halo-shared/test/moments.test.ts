@@ -45,7 +45,9 @@ function ctx(hh: number, mm: number, over: Partial<PaContext> = {}, f: Partial<D
 
 const clock = (at: number) => formatClock(hourOfDay(new Date(at)));
 const summary = (c: PaContext, delivered: Delivered[] = []) =>
-  planDay(c, delivered).map((m) => `${clock(m.at)} ${m.moment}:${m.insight.type}`);
+  planDay(c, delivered)
+    .filter((m) => m.moment !== 'quiet_days')
+    .map((m) => `${clock(m.at)} ${m.moment}:${m.insight.type}`);
 
 describe('planDay', () => {
   it('plans a whole day from a 6 am start, spaced and capped', () => {
@@ -60,8 +62,7 @@ describe('planDay', () => {
   });
 
   it('slides a meal reminder to keep 90 minutes from the weigh-in, within its window', () => {
-    const plan = planDay(ctx(6, 0));
-    const [weigh, breakfast] = plan;
+    const [weigh, breakfast] = planDay(ctx(6, 0));
     expect(breakfast!.at - weigh!.at).toBe(90 * 60_000);
   });
 
@@ -99,7 +100,7 @@ describe('planDay', () => {
 
   it('keeps quiet hours: nothing after bedtime, tomorrow’s weigh-in only', () => {
     expect(summary(ctx(23, 30))).toEqual(['07:15 weigh_in:weigh_in']);
-    expect(planDay(ctx(23, 30))[0]!.day).toBe('2026-10-15');
+    expect(planDay(ctx(23, 30)).find((m) => m.moment === 'weigh_in')!.day).toBe('2026-10-15');
   });
 
   it('leads tomorrow’s weigh-in with today’s outcome', () => {
@@ -116,7 +117,7 @@ describe('planDay', () => {
         expiresAt: null,
       },
     ];
-    const weigh = planDay(ctx(23, 30, { history })).at(-1)!;
+    const weigh = planDay(ctx(23, 30, { history })).find((m) => m.moment === 'weigh_in')!;
     expect(weigh.lead).toBe('You closed the protein gap yesterday.');
   });
 
@@ -139,5 +140,27 @@ describe('planDay', () => {
     expect(summary(ctx(21, 0, {}, { sleepHours: 5.6, mealsLogged: 3, loggedTypes: ['breakfast', 'lunch', 'dinner'], waterMl: 2500 }))).toContain(
       '22:00 bedtime:bedtime',
     );
+  });
+
+  it('always leaves a quiet-days nudge two days out, at the usual lunch time', () => {
+    const quiet = planDay(ctx(20, 0)).find((m) => m.moment === 'quiet_days')!;
+    expect(quiet.day).toBe('2026-10-16');
+    expect(new Date(quiet.at).getDate()).toBe(16);
+    expect(clock(quiet.at)).toBe('13:00');
+    expect(quiet.insight.copy.tagline).toBe('Pick it back up');
+  });
+
+  it('sends the weekly review on Sunday evening', () => {
+    const sunday = new Date(2026, 9, 18, 17, 0);
+    const c = {
+      ...ctx(17, 0, {
+        day: '2026-10-18',
+        week: { days: 7, avg: 74.4, prevAvg: 68 },
+      }, { mealsLogged: 3, loggedTypes: ['breakfast', 'lunch', 'dinner'], waterMl: 2500 }),
+      now: sunday.getTime(),
+    };
+    const review = planDay(c).find((m) => m.moment === 'weekly_review')!;
+    expect(clock(review.at)).toBe('19:00');
+    expect(review.insight.copy.line).toBe('You averaged 74 over 7 days, 6 up on last week.');
   });
 });

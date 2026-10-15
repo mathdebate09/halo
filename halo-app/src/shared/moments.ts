@@ -8,12 +8,12 @@
 // swiping away, and nothing already sent.
 
 import { briefCopy } from './brief-copy';
-import { addDays } from './day';
+import { addDays, dayStart } from './day';
 import { inQuietHours, usualHour, wrapHour } from './learning';
 import { IGNORE_LIMIT, ignoredStreak, outcomeLine } from './loop';
 import { rankSignals } from './pa';
 import { expectedDayFraction, expectedIntakeFraction } from './scoring';
-import { bedtimeOf, type Insight, type InsightKind, type PaContext } from './signals';
+import { bedtimeOf, type Insight, type InsightKind, type PaContext, quietDays } from './signals';
 
 export const MAX_PER_DAY = 6;
 const HOUR_MS = 3_600_000;
@@ -44,10 +44,22 @@ export const CHANNEL_OF: Record<InsightKind, NotifyChannel> = {
   weigh_in: 'weight',
   sleep_debt: 'sleep',
   bedtime: 'sleep',
+  wake_ask: 'review',
+  weekly_review: 'review',
+  quiet_days: 'review',
   on_track: 'review',
 };
 
-export type MomentKind = 'weigh_in' | 'breakfast' | 'lunch' | 'dinner' | 'pace' | 'wrap_up' | 'bedtime';
+export type MomentKind =
+  | 'weigh_in'
+  | 'breakfast'
+  | 'lunch'
+  | 'dinner'
+  | 'pace'
+  | 'wrap_up'
+  | 'bedtime'
+  | 'weekly_review'
+  | 'quiet_days';
 
 /** What each moment may carry: a meal moment only its meal, the pace check only a gap, etc. */
 const CARRIES: Record<MomentKind, readonly InsightKind[]> = {
@@ -58,6 +70,8 @@ const CARRIES: Record<MomentKind, readonly InsightKind[]> = {
   pace: ['protein_pace', 'calorie_pace', 'water_pace', 'calorie_over'],
   wrap_up: ['protein_pace', 'water_pace', 'calorie_pace'],
   bedtime: ['bedtime'],
+  weekly_review: ['weekly_review'],
+  quiet_days: ['quiet_days'],
 };
 
 /** A notification the PA has decided to send. */
@@ -136,7 +150,16 @@ type Candidate = {
 };
 
 /** Which moment wins a clash: the ones tied to a time of day first, then the checks. */
-const PRIORITY: readonly MomentKind[] = ['bedtime', 'weigh_in', 'breakfast', 'lunch', 'dinner', 'pace', 'wrap_up'];
+const PRIORITY: readonly MomentKind[] = [
+  'bedtime',
+  'weigh_in',
+  'breakfast',
+  'lunch',
+  'dinner',
+  'weekly_review',
+  'pace',
+  'wrap_up',
+];
 
 /**
  * The notifications to schedule from now on: the rest of today and tomorrow's weigh-in.
@@ -159,6 +182,9 @@ export function planDay(ctx: PaContext, delivered: readonly Delivered[] = []): M
     candidates.push({ moment: 'pace', from: 15, until: 16.5 });
     candidates.push({ moment: 'wrap_up', from: 20.5, until: 21.5 });
     candidates.push({ moment: 'bedtime', from: bedClock - 0.5, until: bedClock - 0.5 });
+    if (dayStart(ctx.day).getDay() === 0) {
+      candidates.push({ moment: 'weekly_review', from: 19, until: 20.5 });
+    }
     if (ctx.hour < wake + 0.25) {
       candidates.push({ moment: 'weigh_in', from: wake + 0.25, until: wake + 2 });
     }
@@ -222,6 +248,20 @@ export function planDay(ctx: PaContext, delivered: readonly Delivered[] = []): M
         channel: 'weight',
       });
     }
+  }
+  // Two quiet days from now: every open re-plans, so this only goes out if the app stays closed.
+  const quietAt = atClock(48 + usualHour(ctx.windows, 'lunch') - 0.25 - (inDay ? 0 : 24));
+  const quietDay = addDays(ctx.day, 2);
+  if (!muted(ctx, 'quiet_days')) {
+    const signal = quietDays(ctx, quietDay, quietAt);
+    planned.push({
+      at: quietAt,
+      day: quietDay,
+      moment: 'quiet_days',
+      insight: { ...signal, copy: briefCopy(signal) },
+      lead: null,
+      channel: 'review',
+    });
   }
   return planned.sort((a, b) => a.at - b.at);
 }

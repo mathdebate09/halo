@@ -2,29 +2,40 @@
 // stored insight history), asks halo-shared's `brief` for the one thing worth saying, and keeps
 // the loop closed (shown → acted / resolved / ignored). Mounted inside TodayScoresProvider.
 
-import { and, desc, eq, isNull, max } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, max } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { createContext, type ReactNode, use, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
+import { useMMKVBoolean } from 'react-native-mmkv';
 
 import { db } from '@/db/client';
-import { hcDaily, meals, water, weights } from '@/db/schema';
+import { dailyScores, hcDaily, meals, water, weights } from '@/db/schema';
 import { kv } from '@/lib/kv';
 import {
   addDays,
   bedtimeOf,
   brief,
   type Brief,
+  dayStart,
   hourOfDay,
   type PaContext,
   transitions,
   weighInDue,
+  type WeekStats,
 } from '@/shared';
 import { useHaloTheme } from '@/theme/theme-provider';
 import { useTodayScores } from '@/today/today-scores';
 
 import { useDailyScoreWriter } from './daily-score';
-import { isWeekend, noteAppOpen, refreshLearned, useLearned, windowsOn } from './learned';
+import {
+  installDay,
+  isWeekend,
+  noteAppOpen,
+  refreshLearned,
+  useLearned,
+  WAKE_ASK_DONE_KEY,
+  windowsOn,
+} from './learned';
 import { applyTransitions, useInsightHistory } from './loop-store';
 import { reschedule } from './notify';
 import { phraseItemFor, readPhrase, requestPhrases } from './phrasing';
@@ -42,6 +53,22 @@ export type Assistant = {
 };
 
 const AssistantContext = createContext<Assistant | null>(null);
+
+/** Whole days from one day key to another. */
+const daysBetween = (from: string, to: string) =>
+  Math.round((dayStart(to, 12).getTime() - dayStart(from, 12).getTime()) / 86_400_000);
+
+const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.length;
+
+/** The last seven days' average overall score (today included) and the seven before it. */
+function weekStats(rows: { day: string; overall: number | null }[], day: string): WeekStats | null {
+  const cut = addDays(day, -6);
+  const scored = rows.filter((r): r is { day: string; overall: number } => r.overall != null);
+  const week = scored.filter((r) => r.day >= cut).map((r) => r.overall);
+  const prev = scored.filter((r) => r.day < cut).map((r) => r.overall);
+  if (!week.length) return null;
+  return { days: week.length, avg: mean(week), prevAvg: prev.length >= 3 ? mean(prev) : null };
+}
 
 const num = (v: string | number | null | undefined) => (v == null ? null : Number(v));
 
@@ -98,6 +125,17 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     [day],
   );
 
+  // The last two weeks of daily scores (ids are day keys): this week against the one before.
+  const { data: scoreRows } = useLiveQuery(
+    db
+      .select({ day: dailyScores.id, overall: dailyScores.overall })
+      .from(dailyScores)
+      .where(and(gte(dailyScores.id, addDays(day, -13)), isNull(dailyScores.deletedAt))),
+    [day],
+  );
+  const [wakeAskDone] = useMMKVBoolean(WAKE_ASK_DONE_KEY, kv);
+  const installed = installDay();
+
   const weekend = isWeekend(day);
   const lastWeighDay = lastWeigh[0]?.day ?? null;
   const logTimes = [num(lastMeal[0]?.at), num(lastWater[0]?.at)].filter(
@@ -122,6 +160,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     lastWeighDay,
     lastLogAt: logTimes.length ? Math.max(...logTimes) : null,
     history: records,
+    daysSinceInstall: installed ? daysBetween(installed, day) : 0,
+    wakeAsked: !!wakeAskDone,
+    week: weekStats(scoreRows, day),
   };
 
   const heldId = kv.getString(HELD_KEY) ?? null;
@@ -151,6 +192,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     context.weighedToday,
     context.lastLogAt,
     learned?.updatedAt,
+    wakeAskDone,
   ].join('|');
   useEffect(() => {
     const timer = setTimeout(() => {

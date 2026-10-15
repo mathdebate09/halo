@@ -4,7 +4,7 @@
 // Halo has learned about the user. Each rule only says what it sees; none of them decides what
 // reaches the user. That is the PA's job (pa.ts).
 
-import { formatClock } from './day';
+import { dayStart, formatClock } from './day';
 import {
   behind,
   type DayFacts,
@@ -35,6 +35,9 @@ export const INSIGHT_KINDS = [
   'weigh_in',
   'sleep_debt',
   'bedtime',
+  'wake_ask',
+  'weekly_review',
+  'quiet_days',
   'on_track',
 ] as const;
 export type InsightKind = (typeof INSIGHT_KINDS)[number];
@@ -102,7 +105,15 @@ export type PaContext = {
   lastLogAt: number | null;
   /** Stored insights from the last two weeks. */
   history: readonly InsightRecord[];
+  /** Whole days since the first open (0 on day one). */
+  daysSinceInstall?: number | null;
+  /** The user answered (or waved off) the wake-time ask. */
+  wakeAsked?: boolean;
+  /** Overall scores of the last seven days (today included) and the seven before. */
+  week?: WeekStats | null;
 };
+
+export type WeekStats = { days: number; avg: number; prevAvg: number | null };
 
 const HOUR_MS = 3_600_000;
 const MAIN_MEALS = ['breakfast', 'lunch', 'dinner'] as const;
@@ -314,6 +325,61 @@ function sleep(ctx: PaContext): Signal | null {
   };
 }
 
+/** Day 3 and still guessing the wake time: ask once (SPEC §4 "Learning"). */
+function wakeAsk(ctx: PaContext): Signal | null {
+  if (ctx.wakeAsked || (ctx.daysSinceInstall ?? 0) < 2) return null;
+  if (ctx.wake.source === 'measured' || ctx.wake.source === 'asked') return null;
+  return {
+    id: `${ctx.day}:wake_ask`,
+    type: 'wake_ask',
+    severity: 40,
+    reason: 'Your weigh-in and bedtime are set from it.',
+    action: { kind: 'ask_wake' },
+    expiresAt: atHour(ctx, bedtimeOf(ctx).hour - 0.5),
+    tab: null,
+    facts: {},
+  };
+}
+
+const REVIEW_FROM = 18;
+const TREND = 3;
+
+/** Sunday evening: the week in one line, against the week before. */
+function weeklyReview(ctx: PaContext): Signal | null {
+  const w = ctx.week;
+  if (!w || w.days < 3 || dayStart(ctx.day).getDay() !== 0 || ctx.hour < REVIEW_FROM) return null;
+  const delta = w.prevAvg == null ? 0 : round(w.avg - w.prevAvg);
+  return {
+    id: `${ctx.day}:weekly_review`,
+    type: 'weekly_review',
+    severity: 30,
+    reason: 'A week shows the trend a single day can’t.',
+    action: null,
+    expiresAt: atHour(ctx, bedtimeOf(ctx).hour),
+    tab: 'meal',
+    facts: {
+      avg: round(w.avg),
+      days: w.days,
+      delta: Math.abs(delta),
+      trend: w.prevAvg == null ? 'first' : delta >= TREND ? 'up' : delta <= -TREND ? 'down' : 'level',
+    },
+  };
+}
+
+/** Two quiet days in a row (scheduled ahead, and pushed back every time the app opens). */
+export function quietDays(ctx: PaContext, day: string, at: number): Signal {
+  return {
+    id: `${day}:quiet_days`,
+    type: 'quiet_days',
+    severity: 30,
+    reason: 'A single log restarts the picture.',
+    action: { kind: 'log', note: '' },
+    expiresAt: at + 6 * HOUR_MS,
+    tab: null,
+    facts: {},
+  };
+}
+
 /** The brief when nothing else passes: the day is fine, nothing needs the user. */
 export function onTrack(ctx: PaContext): Signal {
   return {
@@ -338,5 +404,7 @@ export function detectSignals(ctx: PaContext, weighDue: boolean): Signal[] {
     waterPace(ctx),
     weighIn(ctx, weighDue),
     sleep(ctx),
+    wakeAsk(ctx),
+    weeklyReview(ctx),
   ].filter((s): s is Signal => s != null);
 }
