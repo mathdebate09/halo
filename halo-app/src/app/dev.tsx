@@ -52,6 +52,7 @@ import { outbox, water } from '@/db/schema';
 import { formatTime } from '@/lib/clock';
 import { getDevice } from '@/lib/device';
 import { kv } from '@/lib/kv';
+import { ScreenTimeCard } from '@/onboarding/screen-time-card';
 import { resetOnboarding, useOnboarding } from '@/onboarding/state';
 import { API_URL } from '@/sync/api';
 import { useSyncStatus } from '@/sync/status';
@@ -245,6 +246,10 @@ function ScreenTimeRow() {
     );
   return (
     <Row title="Screen time (sleep)" status={[`access ${access}`, ...lines].join('\n')}>
+      {/* The onboarding card (scr 3), previewed here since onboarding is locked once done. */}
+      <View className="w-full">
+        <ScreenTimeCard />
+      </View>
       <Btn label="Open Usage access" onPress={openUsageAccess} />
       <Btn
         label="Read nights now"
