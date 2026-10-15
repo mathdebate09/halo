@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -101,12 +101,37 @@ export default function VitalsScreen() {
             return (
               <View key={key} className="mt-6 gap-2">
                 {area ? (
-                  <AreaCard area={area} summary={areaSummary(area, rows, vitalsInput, pounds)} />
+                  <AreaCard
+                    area={area}
+                    summary={areaSummary(area, rows, vitalsInput, pounds)}
+                    action={
+                      key === 'body' && area.source === 'assumed'
+                        ? { label: 'Weigh in', onPress: () => router.push('/weigh-in') }
+                        : undefined
+                    }
+                  />
                 ) : (
                   <AreaHeader areaKey={key} />
                 )}
                 {rows.map((row) => (
-                  <MetricRow key={row.key} row={row} today={day} pounds={pounds} />
+                  <MetricRow
+                    key={row.key}
+                    row={row}
+                    today={day}
+                    pounds={pounds}
+                    onPress={
+                      row.key === 'weight_trend' ? () => router.push('/weigh-in') : undefined
+                    }
+                    onCorrect={
+                      row.key === 'sleep' && (row.source === 'estimated' || row.manual)
+                        ? () =>
+                            router.push({
+                              pathname: '/sleep-hours',
+                              params: { day: row.day ?? day, hours: String(row.value) },
+                            })
+                        : undefined
+                    }
+                  />
                 ))}
                 {empty ? (
                   <EmptyRow

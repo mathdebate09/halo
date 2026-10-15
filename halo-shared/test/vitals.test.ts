@@ -62,6 +62,17 @@ describe('vitalsReport', () => {
     expect(screen.score).toBe(100);
   });
 
+  it('takes a corrected night over the screen estimate, as measured and marked as entered', () => {
+    const d = days(1, () => ({
+      sleepMin: 420,
+      sleepManual: true,
+      screenNight: { start: 0, end: 0, hours: 9.5 },
+    }));
+    expect(areaOf('sleep', d)!.source).toBe('measured');
+    const row = vitalsDetail(input(d), vitalsReport(input(d))).rows[0]!;
+    expect(row).toMatchObject({ key: 'sleep', value: 7, source: 'measured', manual: true });
+  });
+
   it('prefers Health Connect over the screen for the same night', () => {
     const a = areaOf('sleep', days(1, () => ({ sleepMin: 330, screenNight: { start: 0, end: 0, hours: 8 } })))!;
     expect(a.source).toBe('measured');
@@ -140,6 +151,7 @@ describe('sleep regularity', () => {
       start: at(addDays(day, -1), bed),
       end: at(day, wake),
       source: 'measured' as const,
+      manual: false,
     });
     const regular = [0, 1, 2, 3].map((i) => night(addDays(TODAY, -i), 23, 7));
     expect(sleepSpread(regular.slice(0, 3))).toBeNull();

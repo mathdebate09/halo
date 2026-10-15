@@ -1,6 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text, View } from 'react-native';
 
+import { PressScale } from '@/components/press-scale';
 import { type Area, AREA_LABELS, AREA_STATE_LABELS } from '@/shared';
 import { useHaloTheme } from '@/theme/theme-provider';
 import { withAlpha } from '@/theme/themes';
@@ -11,7 +12,16 @@ import { AREA_ICONS, stateColor } from './areas';
  * One area at the head of its readings (Oura vitals style): icon, name, its state, and one plain
  * sentence of the numbers behind it. No score: the 0-100 only places its orb on the hero.
  */
-export function AreaCard({ area, summary }: { area: Area; summary: string }) {
+export function AreaCard({
+  area,
+  summary,
+  action,
+}: {
+  area: Area;
+  summary: string;
+  /** The one step that fills a gap (e.g. "Weigh in" when there's no trend yet). */
+  action?: { label: string; onPress: () => void };
+}) {
   const { theme } = useHaloTheme();
   const c = theme.colors;
   const tint = stateColor(c, area.state);
@@ -48,6 +58,15 @@ export function AreaCard({ area, summary }: { area: Area; summary: string }) {
           </View>
         </View>
         <Text className="mt-4 font-sans text-[17px] leading-[25px] text-text/90">{summary}</Text>
+        {action ? (
+          <PressScale
+            accessibilityRole="button"
+            onPress={action.onPress}
+            pressableStyle={{ alignSelf: 'flex-start' }}
+            className="mt-4 rounded-pill bg-glass/10 px-5 py-2.5">
+            <Text className="font-sans-medium text-[15px] text-text">{action.label}</Text>
+          </PressScale>
+        ) : null}
       </View>
     </View>
   );

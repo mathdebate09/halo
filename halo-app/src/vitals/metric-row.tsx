@@ -30,24 +30,29 @@ function sourceLine(row: VitalRow, today: string): string {
 /**
  * One reading: its name and where it came from, the figure with a slider against its usual band,
  * and one line saying in words how it compares ("Shorter than your usual 9.4–10.5 h"), tinted
- * by whether that's good.
+ * by whether that's good. `onPress` opens where it's logged (weight); `onCorrect` lets the user
+ * correct an estimate (sleep from phone use).
  */
 export function MetricRow({
   row,
   today,
   pounds,
+  onPress,
+  onCorrect,
 }: {
   row: VitalRow;
   today: string;
   pounds: boolean;
+  onPress?: () => void;
+  onCorrect?: () => void;
 }) {
   const { theme } = useHaloTheme();
   const tint = rowColor(theme.colors, row.state);
   const { figure, unit } = displayValue(row, pounds);
   const compare = compareText(row, pounds);
   const band = shownBand(row);
-  return (
-    <View className="rounded-[24px] bg-glass/5 px-5 py-4">
+  const body = (
+    <>
       <View className="flex-row items-start justify-between">
         <Text className="flex-1 pr-3 font-sans text-[16px] text-text">
           {METRIC_LABELS[row.key]}
@@ -69,13 +74,31 @@ export function MetricRow({
           />
         ) : null}
       </View>
-      {compare ? (
-        <Text className="mt-1 font-sans text-[14px]" style={{ color: tint }}>
-          {compare}
-        </Text>
+      {compare || onCorrect ? (
+        <View className="mt-1 flex-row items-center justify-between">
+          <Text className="flex-1 pr-3 font-sans text-[14px]" style={{ color: tint }}>
+            {compare ?? ''}
+          </Text>
+          {onCorrect ? (
+            <PressScale accessibilityRole="button" onPress={onCorrect} hitSlop={10}>
+              <Text className="font-sans-medium text-[14px] text-text">Correct</Text>
+            </PressScale>
+          ) : null}
+        </View>
       ) : null}
-    </View>
+    </>
   );
+  if (onPress) {
+    return (
+      <PressScale
+        accessibilityRole="button"
+        onPress={onPress}
+        className="rounded-[24px] bg-glass/5 px-5 py-4">
+        {body}
+      </PressScale>
+    );
+  }
+  return <View className="rounded-[24px] bg-glass/5 px-5 py-4">{body}</View>;
 }
 
 /**

@@ -20,6 +20,8 @@ import {
 } from '@/shared';
 
 export const VITALS_DAYS = 14;
+/** `vitals_readings.metric` of a night's hours the user corrected (value in hours). */
+export const SLEEP_METRIC = 'sleep_hours';
 
 type HcRow = typeof hcDaily.$inferSelect;
 type NumericField = Exclude<
@@ -125,9 +127,18 @@ export function useVitalsInput(
   }
   // Oldest first, so the day's latest manual reading is the one left standing.
   for (const r of readings) {
-    const target = METRIC_FIELDS[r.metric];
     const row = rows.get(dayKey(new Date(r.at)));
-    if (!target || !row) continue;
+    if (!row) continue;
+    if (r.metric === SLEEP_METRIC) {
+      // A corrected night: the user's hours, with the screen's bed and wake times kept for timing.
+      row.sleepMin = Math.round(r.value * 60);
+      row.sleepManual = true;
+      row.sleepStart ??= row.screenNight?.start ?? null;
+      row.sleepEnd ??= row.screenNight?.end ?? null;
+      continue;
+    }
+    const target = METRIC_FIELDS[r.metric];
+    if (!target) continue;
     (row as Record<NumericField, number | null | undefined>)[target.field] = target.convert
       ? target.convert(r.value, r.unit)
       : r.value;

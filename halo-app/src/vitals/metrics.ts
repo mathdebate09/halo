@@ -31,6 +31,7 @@ export const METRIC_LABELS: Record<RowKey, string> = {
 
 /** Where a row's number came from, in words the user knows. */
 export function sourceText(row: VitalRow): string {
+  if (row.manual) return 'Your entry';
   if (row.key === 'sleep') {
     return row.source === 'estimated' ? 'Estimated from phone use' : 'Health Connect';
   }

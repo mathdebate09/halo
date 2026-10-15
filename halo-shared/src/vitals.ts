@@ -31,6 +31,8 @@ export type VitalsDay = ActivityDay & {
   sleepMin?: number | null;
   sleepStart?: number | null;
   sleepEnd?: number | null;
+  /** The night's hours were entered by the user (a correction of the estimate); counts as measured. */
+  sleepManual?: boolean | null;
   /** The screen's estimate of the same night, used when Health Connect has none. */
   screenNight?: { start: number; end: number; hours: number } | null;
   /** Screen-on minutes this day, and from 23:00 until the rollover. */
@@ -190,7 +192,15 @@ export function baselineValues(input: VitalsInput, key: NumKey, exceptDay?: stri
     .filter(present) as number[];
 }
 
-export type Night = { day: string; hours: number; start: number | null; end: number | null; source: VitalsSource };
+export type Night = {
+  day: string;
+  hours: number;
+  start: number | null;
+  end: number | null;
+  source: VitalsSource;
+  /** Entered by the user rather than read from a source. */
+  manual: boolean;
+};
 
 /** Each day's night: Health Connect when it has one, otherwise the screen's estimate. */
 export function nightsOf(input: VitalsInput): Night[] {
@@ -203,6 +213,7 @@ export function nightsOf(input: VitalsInput): Night[] {
         start: d.sleepStart ?? null,
         end: d.sleepEnd ?? null,
         source: 'measured',
+        manual: !!d.sleepManual,
       });
     } else if (d.screenNight) {
       nights.push({
@@ -211,6 +222,7 @@ export function nightsOf(input: VitalsInput): Night[] {
         start: d.screenNight.start,
         end: d.screenNight.end,
         source: 'estimated',
+        manual: false,
       });
     }
   }
@@ -547,6 +559,8 @@ export type VitalRow = {
   /** The usual band (own p25-p75, or a typical range) for the slider, or null. */
   band: { lo: number; hi: number; own: boolean } | null;
   day: string | null;
+  /** Entered by the user (e.g. a corrected night), not read from a source. */
+  manual?: boolean;
 };
 
 /** A measured-only metric with no reading yet: shown as an ask, never estimated. */
@@ -625,6 +639,7 @@ export function vitalsDetail(input: VitalsInput, report: VitalsReport): VitalsDe
       source: last.source,
       band: bandFor(nights.filter((n) => n !== last).map((n) => n.hours), [need - 0.5, need + 1]),
       day: last.day,
+      manual: last.manual,
     });
   }
 
