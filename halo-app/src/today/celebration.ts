@@ -34,10 +34,16 @@ export function mealReaction(before: TodayScores, after: TodayScores): string | 
   return null;
 }
 
-/** Returns a counter for ScoreArc's glow; bumps it (plus haptic and line) after each logged meal. */
-export function useMealCelebration(scores: TodayScores) {
+/**
+ * Returns a counter for ScoreArc's glow; bumps it after each logged meal. When Today is the
+ * screen in view (`announce`) it also adds the haptic and the reaction line as a toast; a meal
+ * logged in the Meal Logger shows its line there instead.
+ */
+export function useMealCelebration(scores: TodayScores, announce: boolean) {
   const latest = useRef(scores);
   latest.current = scores;
+  const announcing = useRef(announce);
+  announcing.current = announce;
   const [glow, setGlow] = useState(0);
 
   useEffect(
@@ -45,10 +51,10 @@ export function useMealCelebration(scores: TodayScores) {
       onMealLogged(() => {
         const before = latest.current;
         setTimeout(() => {
-          const after = latest.current;
           setGlow((g) => g + 1);
+          if (!announcing.current) return;
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          const line = mealReaction(before, after);
+          const line = mealReaction(before, latest.current);
           if (line) showToast(line);
         }, SETTLE_MS);
       }),
@@ -56,4 +62,25 @@ export function useMealCelebration(scores: TodayScores) {
   );
 
   return glow;
+}
+
+/**
+ * The reaction line for a meal just logged where the user is (the Meal Logger's check), or null.
+ * `reset` clears it for the next meal.
+ */
+export function useMealReaction(scores: TodayScores) {
+  const latest = useRef(scores);
+  latest.current = scores;
+  const [reaction, setReaction] = useState<string | null>(null);
+
+  useEffect(
+    () =>
+      onMealLogged(() => {
+        const before = latest.current;
+        setTimeout(() => setReaction(mealReaction(before, latest.current)), SETTLE_MS);
+      }),
+    [],
+  );
+
+  return { reaction, reset: () => setReaction(null) };
 }

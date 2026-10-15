@@ -14,6 +14,7 @@ import { db } from '@/db/client';
 import { deleteRecord, upsertRecord } from '@/db/mutate';
 import { weights } from '@/db/schema';
 import { useProfile } from '@/lib/plan';
+import { dayLabel } from '@/lib/day-label';
 import { useUnits } from '@/lib/units';
 import { addDays, clamp, dayKey, dayStart, displayWeight, round, WEIGHT_RANGE_KG } from '@/shared';
 import { useHaloTheme } from '@/theme/theme-provider';
@@ -23,16 +24,6 @@ import { useHaloTheme } from '@/theme/theme-provider';
 
 const BACKFILL_DAYS = 30;
 const EASE_SHEET = Easing.bezier(0.32, 0.72, 0, 1);
-
-function dayLabel(day: string, today: string) {
-  if (day === today) return 'Today';
-  if (day === addDays(today, -1)) return 'Yesterday';
-  return dayStart(day, 12).toLocaleDateString(undefined, {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-}
 
 export default function WeighInSheet() {
   const insets = useSafeAreaInsets();

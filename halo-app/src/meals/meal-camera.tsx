@@ -27,6 +27,8 @@ const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const LIFT_MS = 450;
 
 type Props = {
+  /** The camera runs only while the logger is on screen and capturing. */
+  active: boolean;
   photo: string | null;
   onPhoto: (uri: string | null) => void;
 };
@@ -36,7 +38,7 @@ type Props = {
  * and permission is granted. Tapping lifts the blur into a clear viewfinder with a shutter; the
  * shot then freezes in the card. Without the camera the theme gradient stays and opens the gallery.
  */
-export function MealCamera({ photo, onPhoto }: Props) {
+export function MealCamera({ active, photo, onPhoto }: Props) {
   const { theme } = useHaloTheme();
   const [permission, requestPermission] = useCameraPermissions();
   const [lifted, setLifted] = useState(false);
@@ -120,7 +122,7 @@ export function MealCamera({ photo, onPhoto }: Props) {
         </Animated.View>
       ) : (
         <>
-          {granted ? (
+          {granted && active ? (
             <Animated.View style={[StyleSheet.absoluteFill, cameraStyle]}>
               <BlurTargetView ref={blurTarget} style={StyleSheet.absoluteFill}>
                 <CameraView

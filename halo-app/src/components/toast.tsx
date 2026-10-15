@@ -25,9 +25,13 @@ function hide(id: number) {
 }
 
 /** Extra bottom space claimed by something floating above the dock (the pending meal card). */
+const lifts = new Map<string, number>();
 let lift = 0;
-export function setToastLift(px: number) {
-  lift = px;
+/** Extra bottom space claimed by `key` (0 releases it); toasts clear the largest claim. */
+export function setToastLift(key: string, px: number) {
+  if (px > 0) lifts.set(key, px);
+  else lifts.delete(key);
+  lift = Math.max(0, ...lifts.values());
   emit();
 }
 

@@ -1,7 +1,7 @@
 import { and, desc, inArray, isNull } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import Animated, {
@@ -33,11 +33,12 @@ const CARD_HEIGHT = 62;
 
 /**
  * Meals between capture and logging, as one slim card above the dock: "Analysing…" while the job
- * runs, then "Ready to review". Tapping opens the confirm sheet for the one that needs you first.
+ * runs, then "Ready to review". Tapping opens it in the Meal Logger.
  */
 export function PendingMealCard() {
   const insets = useSafeAreaInsets();
   const { theme } = useHaloTheme();
+  const focused = useIsFocused();
   const { data } = useLiveQuery(
     db
       .select({
@@ -57,9 +58,9 @@ export function PendingMealCard() {
   const visible = !!first;
   // Toasts float above the card while it's showing.
   useEffect(() => {
-    setToastLift(visible ? CARD_HEIGHT + 8 : 0);
-    return () => setToastLift(0);
-  }, [visible]);
+    setToastLift('pending-card', visible && focused ? CARD_HEIGHT + 8 : 0);
+    return () => setToastLift('pending-card', 0);
+  }, [visible, focused]);
   if (!first) return null;
   const more = data.length - 1;
   const label =
@@ -83,7 +84,7 @@ export function PendingMealCard() {
       <PressScale
         accessibilityRole="button"
         accessibilityLabel={`${name}. ${label}${more > 0 ? `, and ${more} more` : ''}`}
-        onPress={() => router.push({ pathname: '/meal/[id]', params: { id: first.id } })}
+        onPress={() => router.navigate({ pathname: '/log', params: { meal: first.id } })}
         className="flex-row items-center rounded-pill border border-hairline/10 bg-surface p-2 pr-4">
         <View className="h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-glass/10">
           {first.photoUri ? (

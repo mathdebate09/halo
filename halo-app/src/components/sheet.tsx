@@ -15,6 +15,8 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   accessibilityLabel: string;
+  /** Extra space under the content, e.g. for the floating dock inside a tab. */
+  extraBottom?: number;
   children: ReactNode;
 };
 
@@ -22,7 +24,7 @@ type Props = {
  * A bottom sheet inside the current screen: tinted backdrop, a glass-edged panel that rises from
  * the bottom edge and leaves the same way. Back and a tap outside close it.
  */
-export function Sheet({ visible, onClose, accessibilityLabel, children }: Props) {
+export function Sheet({ visible, onClose, accessibilityLabel, extraBottom = 0, children }: Props) {
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -53,7 +55,7 @@ export function Sheet({ visible, onClose, accessibilityLabel, children }: Props)
         <View className="mb-4 h-1 w-10 self-center rounded-pill bg-glass/20" />
         {children}
         {/* A plain View: NativeWind drops `style` on an Animated.View that also has className. */}
-        <View style={{ height: insets.bottom + 16 }} />
+        <View style={{ height: insets.bottom + 16 + extraBottom }} />
       </Animated.View>
     </KeyboardAvoidingView>
   );

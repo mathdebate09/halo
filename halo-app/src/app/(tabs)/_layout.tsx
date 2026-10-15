@@ -8,6 +8,8 @@ export default function TabsLayout() {
     <TodayScoresProvider>
       <Tabs
         tabBar={(props) => <Dock {...props} />}
+        // Back from History returns to the logger, not to Today.
+        backBehavior="history"
         screenOptions={{
           headerShown: false,
           // Tabs are peers: no transition between them.
@@ -17,6 +19,9 @@ export default function TabsLayout() {
         <Tabs.Screen name="index" />
         <Tabs.Screen name="exercise" />
         <Tabs.Screen name="vitals" />
+        {/* The Meal Logger section and its History, reached through the dock's plus. */}
+        <Tabs.Screen name="log" />
+        <Tabs.Screen name="history" />
       </Tabs>
     </TodayScoresProvider>
   );

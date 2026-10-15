@@ -1,5 +1,4 @@
 import type { BottomTabBarProps } from 'expo-router/tabs';
-import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,6 +29,10 @@ export function Dock({ state, navigation }: BottomTabBarProps) {
   const dockFill = useAnimatedThemeBackground('dock');
   const timeOfDay = useTimeOfDay();
   const TodayIcon = timeOfDay === 'day' ? SunIcon : timeOfDay === 'dusk' ? SunsetIcon : MoonIcon;
+  const current = state.routes[state.index]?.name;
+  const logFocused = current === 'log' || current === 'history';
+  // The logger is full screen (its own close button); the dock comes back in its History.
+  if (current === 'log') return null;
 
   return (
     <Reveal
@@ -40,6 +43,8 @@ export function Dock({ state, navigation }: BottomTabBarProps) {
       <View className="flex-1 flex-row overflow-hidden rounded-pill border border-hairline/10">
         <Animated.View style={[StyleSheet.absoluteFill, styles.glass, dockFill]} />
         {state.routes.map((route, index) => {
+          // The logger and its History are reached through the plus, drawn separately.
+          if (route.name === 'log' || route.name === 'history') return null;
           const focused = state.index === index;
           const color = withAlpha(theme.colors.text, focused ? 1 : 0.55);
           const Icon =
@@ -74,14 +79,22 @@ export function Dock({ state, navigation }: BottomTabBarProps) {
         })}
       </View>
 
+      {/* The Meal Logger is a section: its button inverts while you're in it. */}
       <PressScale
-        accessibilityRole="button"
-        accessibilityLabel="Log a meal, water or weight"
-        onPress={() => router.push('/log')}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: logFocused }}
+        accessibilityLabel="Meal Logger"
+        onPress={() => {
+          if (state.routes[state.index]?.name !== 'log') navigation.navigate('log');
+        }}
         style={styles.plus}
         className="items-center justify-center overflow-hidden rounded-pill border border-hairline/10">
-        <Animated.View style={[StyleSheet.absoluteFill, styles.glass, dockFill]} />
-        <PlusIcon size={28} color={theme.colors.text} />
+        {logFocused ? (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.text }]} />
+        ) : (
+          <Animated.View style={[StyleSheet.absoluteFill, styles.glass, dockFill]} />
+        )}
+        <PlusIcon size={28} color={logFocused ? theme.colors.bg : theme.colors.text} />
       </PressScale>
     </Reveal>
   );

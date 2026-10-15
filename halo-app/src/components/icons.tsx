@@ -166,3 +166,13 @@ export function ChevronRightIcon(props: IconProps) {
     </Line>
   );
 }
+
+/** Meal history: the counter-clockwise history arrow around a fork and knife. */
+export function HistoryIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3.5 8.5M3.5 4v4.5H8" />
+      <Path d="M10 8.5v3c0 .9.6 1.5 1.3 1.5M12.6 8.5v3c0 .9-.6 1.5-1.3 1.5v3.5M15.5 8.5c-.9.5-1.3 1.6-1.3 3.3h1.3v4.2" />
+    </Line>
+  );
+}

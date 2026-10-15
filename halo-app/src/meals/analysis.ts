@@ -7,12 +7,19 @@
 import NetInfo from '@react-native-community/netinfo';
 import { and, eq, isNull, lte } from 'drizzle-orm';
 import { File } from 'expo-file-system';
+import { randomUUID } from 'expo-crypto';
 import { AppState } from 'react-native';
 
 import { db } from '@/db/client';
-import { upsertRecord } from '@/db/mutate';
-import { jobs, meals } from '@/db/schema';
-import { hourOfDay, type JobView, type MealAnalysis, mealAnalysisSchema } from '@/shared';
+import { deleteRecord, upsertRecord } from '@/db/mutate';
+import { jobs, mealItems, meals } from '@/db/schema';
+import {
+  hourOfDay,
+  type JobView,
+  MAX_MEAL_NOTE,
+  type MealAnalysis,
+  mealAnalysisSchema,
+} from '@/shared';
 import { api, ApiError } from '@/sync/api';
 
 type Meal = typeof meals.$inferSelect;
@@ -56,6 +63,13 @@ function applyAnalysis(mealId: string, raw: unknown) {
   }
   const analysis: MealAnalysis = parsed.data;
   const items = analysis.isFood ? analysis.items : [];
+  // A re-analysis replaces the previous result's items.
+  const previous = db
+    .select({ id: mealItems.id })
+    .from(mealItems)
+    .where(and(eq(mealItems.mealId, mealId), isNull(mealItems.deletedAt)))
+    .all();
+  for (const old of previous) deleteRecord('mealItem', old.id);
   for (const item of items) upsertRecord('mealItem', { mealId, ...item });
   const sum = (key: 'kcal' | 'proteinG' | 'carbsG' | 'fatG') =>
     items.reduce((a, i) => a + i[key], 0);
@@ -95,7 +109,9 @@ async function submit(meal: Meal) {
       const image = await new File(meal.photoUri).base64();
       const job = await api<JobView>('/meals/analyse-photo', {
         method: 'POST',
-        body: { key: meal.id, image, note: meal.note ?? undefined, ...context },
+        // Each attempt has its own key (jobId, set on re-analysis): the server returns the same job
+        // for a repeated key.
+        body: { key: meal.jobId ?? meal.id, image, note: meal.note ?? undefined, ...context },
         timeoutMs: 30_000,
       });
       retryAt.delete(meal.id);
@@ -235,6 +251,23 @@ export function requestAnalysis() {
       const due = nextDue();
       if (due != null) timer = setTimeout(requestAnalysis, Math.max(500, due - Date.now()));
     });
+}
+
+/**
+ * Re-runs a meal's analysis with the user's correction ("half portion, no oil"): the instruction
+ * joins the note (kept within the note limit), a fresh attempt key is issued, and the new result
+ * replaces the items.
+ */
+export function reanalyse(mealId: string, instruction: string) {
+  const meal = currentMeal(mealId);
+  const text = instruction.trim();
+  if (!meal || !text) return;
+  const base = meal.note?.trim();
+  const note = (base ? `${base}. Correction: ${text}` : text).slice(-MAX_MEAL_NOTE);
+  db.delete(jobs).where(eq(jobs.entityId, mealId)).run();
+  retryAt.delete(mealId);
+  patchMeal(meal, { status: 'analysing', note, jobId: randomUUID() });
+  requestAnalysis();
 }
 
 /** Retries a failed meal's analysis (from the confirm sheet). */

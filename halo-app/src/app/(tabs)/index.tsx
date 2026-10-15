@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig } from 'react-native-reanimated';
@@ -38,7 +38,8 @@ export default function TodayScreen() {
   const [size, setSize] = useState({ width: window.width, height: window.height });
   const { theme, target } = useHaloTheme();
   const scores = useTodayScores();
-  const glow = useMealCelebration(scores);
+  const focused = useIsFocused();
+  const glow = useMealCelebration(scores, focused);
   const copy = todayCopy(target.tier, scores.day, hourOfDay(scores.now), scores.provisional);
   const { width, height } = size;
 

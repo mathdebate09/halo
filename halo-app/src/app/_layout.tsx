@@ -31,14 +31,6 @@ function RootNavigator() {
         <Stack.Protected guard={onboarded}>
           <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
           <Stack.Screen
-            name="log"
-            options={{
-              presentation: 'transparentModal',
-              animation: 'fade',
-              contentStyle: { backgroundColor: 'transparent' },
-            }}
-          />
-          <Stack.Screen
             name="weigh-in"
             options={{
               presentation: 'transparentModal',
