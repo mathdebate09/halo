@@ -2,6 +2,7 @@
 
 export * from './brief-copy.js';
 export * from './day.js';
+export * from './exercise.js';
 export * from './insights.js';
 export * from './learning.js';
 export * from './loop.js';

@@ -5,6 +5,8 @@ import { sql } from 'drizzle-orm';
 import {
   aggregateGroupByDuration,
   aggregateGroupByPeriod,
+  aggregateRecord,
+  ExerciseType,
   getGrantedPermissions,
   getSdkStatus,
   initialize,
@@ -14,9 +16,13 @@ import {
   SdkAvailabilityStatus,
 } from 'react-native-health-connect';
 
+import { useMMKVString } from 'react-native-mmkv';
+
 import { db } from '@/db/client';
 import { hcDaily } from '@/db/schema';
-import { addDays, dayKey, dayStart } from '@/shared';
+import { addDays, dayKey, dayStart, type ExerciseSessionInfo, type SessionKind } from '@/shared';
+
+import { kv } from './kv';
 
 /** Everything Halo reads; mirrors android.permissions in app.json. One system dialog. */
 const READ_TYPES = [
@@ -251,18 +257,27 @@ export async function refreshHealthData(force = false): Promise<void> {
         (level.unit === 'millimolesPerLiter' ? (level.value ?? 0) * 18 : level.value);
       if (mgDl) row(dayOf(r.time)).glucoseMgDl = Math.round(mgDl);
     }
-    // Sleep belongs to the day it ended on (last night → today), naps included.
+    // Sleep belongs to the day it ended on (last night → today), naps included. The night's span
+    // runs from its first start to its last end (the wake time the assistant learns from).
     const asleep = new Map<string, number>();
     for (const r of await readings('SleepSession')) {
       const day = dayOf(r.endTime);
       if (!rows.has(day)) continue;
-      const total = Date.parse(r.endTime) - Date.parse(r.startTime);
+      const start = Date.parse(r.startTime);
+      const end = Date.parse(r.endTime);
       const awake = (r.stages ?? [])
         .filter((st) => AWAKE_STAGES.has(st.stage))
         .reduce((a, st) => a + Date.parse(st.endTime) - Date.parse(st.startTime), 0);
-      asleep.set(day, (asleep.get(day) ?? 0) + Math.max(0, total - awake));
+      asleep.set(day, (asleep.get(day) ?? 0) + Math.max(0, end - start - awake));
+      const d = row(day);
+      d.sleepStart = d.sleepStart == null ? start : Math.min(d.sleepStart, start);
+      d.sleepEnd = d.sleepEnd == null ? end : Math.max(d.sleepEnd, end);
     }
     for (const [day, ms] of asleep) row(day).sleepMin = Math.round(ms / 60_000);
+
+    if (granted.has('ExerciseSession')) {
+      kv.set(SESSIONS_KEY, JSON.stringify(await readSessions(granted.has('Distance'), now)));
+    }
 
     const fetchedAt = now.getTime();
     const values = [...rows].map(([day, r]) => ({ ...r, day, fetchedAt }));
@@ -277,6 +292,8 @@ export async function refreshHealthData(force = false): Promise<void> {
             'distance_m',
             'active_kcal',
             'sleep_min',
+            'sleep_start',
+            'sleep_end',
             'exercise_min',
             'resting_hr',
             'hrv_ms',
@@ -297,3 +314,139 @@ export async function refreshHealthData(force = false): Promise<void> {
 }
 
 const toCamel = (column: string) => column.replace(/_(\w)/g, (_, c: string) => c.toUpperCase());
+
+const SESSIONS_KEY = 'hc.sessions';
+const SESSION_DAYS = 14;
+
+/** "WEIGHTLIFTING" → "Weightlifting", "STAIR_CLIMBING" → "Stair climbing". */
+const TYPE_NAMES = new Map<number, string>(
+  Object.entries(ExerciseType).map(([key, id]) => {
+    const words = key.toLowerCase().replace(/_/g, ' ');
+    return [id as number, words.charAt(0).toUpperCase() + words.slice(1)];
+  }),
+);
+
+function kindOf(type: number): SessionKind {
+  if (type === ExerciseType.WALKING || type === ExerciseType.HIKING) return 'walk';
+  if (type === ExerciseType.RUNNING || type === ExerciseType.RUNNING_TREADMILL) return 'run';
+  if (type === ExerciseType.BIKING || type === ExerciseType.BIKING_STATIONARY) return 'ride';
+  return 'other';
+}
+
+/** The last week's exercise sessions, newest first, each with the distance recorded during it. */
+async function readSessions(withDistance: boolean, now: Date): Promise<ExerciseSessionInfo[]> {
+  const { records } = await readRecords('ExerciseSession', {
+    timeRangeFilter: {
+      operator: 'between',
+      startTime: dayStart(addDays(dayKey(now), -(SESSION_DAYS - 1))).toISOString(),
+      endTime: now.toISOString(),
+    },
+    ascendingOrder: false,
+    pageSize: 50,
+  });
+  const sessions: ExerciseSessionInfo[] = [];
+  for (const r of records) {
+    let distanceM: number | null = null;
+    if (withDistance) {
+      try {
+        const total = await aggregateRecord({
+          recordType: 'Distance',
+          timeRangeFilter: { operator: 'between', startTime: r.startTime, endTime: r.endTime },
+        });
+        distanceM = total.DISTANCE.inMeters || null;
+      } catch {
+        distanceM = null;
+      }
+    }
+    sessions.push({
+      id: r.metadata?.id ?? r.startTime,
+      start: Date.parse(r.startTime),
+      end: Date.parse(r.endTime),
+      title: r.title?.trim() || TYPE_NAMES.get(r.exerciseType) || 'Workout',
+      kind: kindOf(r.exerciseType),
+      type: r.exerciseType,
+      distanceM,
+    });
+  }
+  return sessions;
+}
+
+/** The last week's sessions from the cache, newest first (re-read with every refresh). */
+export function useExerciseSessions(): ExerciseSessionInfo[] {
+  const [raw] = useMMKVString(SESSIONS_KEY, kv);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as ExerciseSessionInfo[];
+  } catch {
+    return [];
+  }
+}
+
+export type HealthConnectState = 'unavailable' | 'update' | 'denied' | 'connected';
+
+/** Where Health Connect stands, for the right empty state: missing, outdated, no access, or on. */
+export async function healthConnectState(): Promise<HealthConnectState> {
+  try {
+    const status = await getSdkStatus();
+    if (status === SdkAvailabilityStatus.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED) return 'update';
+    if (status !== SdkAvailabilityStatus.SDK_AVAILABLE || !(await initialize()))
+      return 'unavailable';
+    const granted = await getGrantedPermissions();
+    return granted.some((p) => p.accessType === 'read') ? 'connected' : 'denied';
+  } catch {
+    return 'unavailable';
+  }
+}
+
+export type HourlyActivity = { steps: number[]; distanceM: number[] };
+
+/**
+ * One day's steps and distance per clock hour (24 buckets from midnight), for the hourly charts.
+ * Read on demand for the day on screen; null when Health Connect can't answer.
+ */
+export async function readHourly(day: string): Promise<HourlyActivity | null> {
+  try {
+    if (!(await ready())) return null;
+    const granted = new Set(
+      (await getGrantedPermissions())
+        .filter((p) => p.accessType === 'read')
+        .map((p) => p.recordType),
+    );
+    const start = dayStart(day, 0);
+    const end = new Date(Math.min(Date.now(), start.getTime() + 24 * 3_600_000));
+    const range = {
+      operator: 'between' as const,
+      startTime: start.toISOString(),
+      endTime: end.toISOString(),
+    };
+    const hourOf = (iso: string) => Math.floor((Date.parse(iso) - start.getTime()) / 3_600_000);
+    const out: HourlyActivity = { steps: Array(24).fill(0), distanceM: Array(24).fill(0) };
+    if (granted.has('Steps')) {
+      const groups = await aggregateGroupByDuration({
+        recordType: 'Steps',
+        timeRangeFilter: range,
+        timeRangeSlicer: { duration: 'HOURS', length: 1 },
+      });
+      for (const g of groups) {
+        const h = hourOf(g.startTime);
+        if (h >= 0 && h < 24) out.steps[h] = (g.result as { COUNT_TOTAL: number }).COUNT_TOTAL;
+      }
+    }
+    if (granted.has('Distance')) {
+      const groups = await aggregateGroupByDuration({
+        recordType: 'Distance',
+        timeRangeFilter: range,
+        timeRangeSlicer: { duration: 'HOURS', length: 1 },
+      });
+      for (const g of groups) {
+        const h = hourOf(g.startTime);
+        if (h >= 0 && h < 24) {
+          out.distanceM[h] = (g.result as { DISTANCE: { inMeters: number } }).DISTANCE.inMeters;
+        }
+      }
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}

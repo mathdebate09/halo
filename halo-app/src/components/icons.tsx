@@ -298,3 +298,59 @@ export function CameraIcon(props: IconProps) {
     </Line>
   );
 }
+
+// Activity glyphs for exercise sessions (same 1.5 line style).
+
+export function WalkIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Circle cx={13} cy={4.5} r={1.5} />
+      <Path d="M11 21l2-6-2.5-2.5L12 8l3 3h3M10.5 12.5L9 9.5 6 11v3M13 15l2.5 6" />
+    </Line>
+  );
+}
+
+export function BikeIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Circle cx={5.5} cy={16.5} r={3.5} />
+      <Circle cx={18.5} cy={16.5} r={3.5} />
+      <Circle cx={15} cy={5} r={1.25} />
+      <Path d="M5.5 16.5L9.5 9h5l4 7.5M9.5 9l3.5 7.5h-7.5M12 7l1.5 2" />
+    </Line>
+  );
+}
+
+export function SwimIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Circle cx={17} cy={7} r={1.5} />
+      <Path d="M3 17c1.5 0 1.5-1 3-1s1.5 1 3 1 1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1M5 13l4-3 3 2 3-3" />
+    </Line>
+  );
+}
+
+export function StrengthIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11" />
+    </Line>
+  );
+}
+
+export function YogaIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Circle cx={12} cy={4.5} r={1.5} />
+      <Path d="M12 7.5v6M6 10.5l6 1.5 6-1.5M6.5 19.5L12 15l5.5 4.5M5 19.5h14" />
+    </Line>
+  );
+}
+
+export function HikeIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M3 19.5l6.5-11 4 6.5 2.5-3.5 5 8zM8 12.5l1.5 1.5 1.5-1.5" />
+    </Line>
+  );
+}
