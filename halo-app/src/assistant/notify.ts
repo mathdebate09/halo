@@ -415,3 +415,49 @@ export async function sendTestOfNext(): Promise<string> {
   });
   return `in 10 s: ${next.title}`;
 }
+
+/**
+ * Dev screen, test phase: sends the brief on Today as a real notification in 10 seconds and
+ * registers it like a planned one, so buttons, taps, swipes and reconcile all run for real.
+ */
+export async function sendRealTest(): Promise<string> {
+  const raw = kv.getString('assistant.currentBrief');
+  if (!raw) return 'no brief yet';
+  const { insight, title, body } = JSON.parse(raw) as {
+    insight: NotifiedInsight;
+    title: string;
+    body: string;
+  };
+  if (insight.type === 'on_track') return 'on track: nothing to send';
+  const at = Date.now() + 10_000;
+  const channel = (
+    insight.type === 'water_pace' || insight.type.endsWith('pace') ? 'pace' : 'review'
+  ) as NotifyChannel;
+  const payload: Payload = { halo: 1, insight, channel, quiet: [0, 0] };
+  const nid = await Notifications.scheduleNotificationAsync({
+    content: { title, body, data: payload, categoryIdentifier: categoryFor(insight.action) },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: new Date(at),
+      channelId: channel,
+    },
+  });
+  // Marked as a snooze so the next re-plan keeps it instead of cancelling it.
+  write(SCHEDULED_KEY, [
+    ...read<Scheduled[]>(SCHEDULED_KEY, []),
+    { nid, at, title, body, insight, channel, snooze: true },
+  ]);
+  return `real in 10 s: ${title} (${nid.slice(0, 8)})`;
+}
+
+/** Dev screen, test phase: cancels snoozed notifications (the real tests register as snoozes). */
+export async function cancelSnoozes(): Promise<string> {
+  const scheduled = read<Scheduled[]>(SCHEDULED_KEY, []);
+  const snoozes = scheduled.filter((s) => s.snooze);
+  for (const s of snoozes) await Notifications.cancelScheduledNotificationAsync(s.nid);
+  write(
+    SCHEDULED_KEY,
+    scheduled.filter((s) => !s.snooze),
+  );
+  return `cancelled ${snoozes.length} snoozed`;
+}

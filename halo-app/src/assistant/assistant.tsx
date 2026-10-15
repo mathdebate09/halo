@@ -46,6 +46,8 @@ import { phraseItemFor, readPhrase, requestPhrases } from './phrasing';
 const HELD_KEY = 'assistant.held';
 /** The latest PA trace, for the dev screen. */
 export const TRACE_KEY = 'assistant.trace';
+/** The current brief, shaped for a notification (dev screen's real test). */
+export const CURRENT_BRIEF_KEY = 'assistant.currentBrief';
 
 export type Assistant = {
   brief: Brief;
@@ -226,6 +228,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     wakeAskDone,
     access,
     screenNights.length,
+    // Outcomes and back-off read the stored states, so a state change re-plans too.
+    records.map((r) => `${r.id}:${r.state}`).join(','),
   ].join('|');
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -262,6 +266,23 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   });
   useEffect(() => {
     if (kv.getString(TRACE_KEY) !== trace) kv.set(TRACE_KEY, trace);
+    // The brief as a notification would carry it (dev screen's real test).
+    kv.set(
+      CURRENT_BRIEF_KEY,
+      JSON.stringify({
+        insight: {
+          id: result.insight.id,
+          day,
+          type: result.insight.type,
+          severity: result.insight.severity,
+          reason: result.insight.reason,
+          action: result.insight.action,
+          expiresAt: result.insight.expiresAt,
+        },
+        title: result.insight.copy.tagline,
+        body: result.insight.copy.line,
+      }),
+    );
   }, [trace]);
 
   return <AssistantContext value={{ brief: result, context, phrase }}>{children}</AssistantContext>;

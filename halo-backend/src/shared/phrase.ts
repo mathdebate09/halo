@@ -13,7 +13,7 @@ import { placeholders } from './brief-copy.js';
 import { INSIGHT_KINDS, type InsightCopy } from './signals.js';
 
 /** Bump when the prompt or the guard changes, so cached wording is asked for again. */
-export const PHRASE_VERSION = 4;
+export const PHRASE_VERSION = 5;
 export const MAX_PHRASE_ITEMS = 4;
 export const PHRASE_LIMITS = { tagline: 32, line: 120, actionLabel: 26 } as const;
 
@@ -66,6 +66,9 @@ const BANNED: readonly RegExp[] = [
   /\b(journey|boost|fuel your|crush|unlock|elevate|empower|wellness)\b/i,
   /\b(here['’]s|consider|why not)\b/i,
   /\b(no pressure|within reach|ease (into|up)|gently|treat yourself|self[- ]care)\b/i,
+  // The voice is never a speaker in the room ("Tell me…", "I'll…", "we").
+  /\b(I|I['’]m|I['’]ll|I['’]d)\b/,
+  /\b(me|my|we|we['’]ll|us|our)\b/i,
   /[!;—–]/,
   /\p{Extended_Pictographic}/u,
 ];
@@ -87,7 +90,12 @@ export function phraseProblem(pattern: InsightCopy, out: InsightCopy): string | 
   for (const p of placeholders(pattern.line)) if (!used.has(p)) return `missing ${p}`;
   const bare = texts.join(' ').replace(/\{\w+\}/g, '');
   if (/\d/.test(bare)) return 'digits';
-  if (bare.includes('?') && !`${pattern.tagline}${pattern.line}`.includes('?')) return 'question';
+  const said = `${pattern.tagline} ${pattern.line}`.toLowerCase();
+  if (bare.includes('?') && !said.includes('?')) return 'question';
+  // A brief about now must not drift to another day.
+  for (const day of ['tomorrow', 'yesterday']) {
+    if (bare.toLowerCase().includes(day) && !said.includes(day)) return `moved to ${day}`;
+  }
   for (const rule of BANNED) if (rule.test(bare)) return `banned ${rule.source}`;
   return null;
 }

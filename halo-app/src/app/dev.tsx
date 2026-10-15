@@ -36,7 +36,14 @@ import { and, count, desc, eq, isNull, sum } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 
 import { TRACE_KEY } from '@/assistant/assistant';
-import { LAST_RESPONSE_KEY, readScheduled, sendTestOfNext } from '@/assistant/notify';
+import { revertActed } from '@/assistant/loop-store';
+import {
+  cancelSnoozes,
+  LAST_RESPONSE_KEY,
+  readScheduled,
+  sendRealTest,
+  sendTestOfNext,
+} from '@/assistant/notify';
 import {
   openUsageAccess,
   refreshScreenNights,
@@ -285,6 +292,22 @@ function NotifyPlanRow() {
       <Btn
         label="Test next in 10 s"
         onPress={() => sendTestOfNext().then(setStatus, (e) => setStatus(errorText(e)))}
+      />
+      <Btn
+        label="Real test: brief in 10 s"
+        onPress={() => sendRealTest().then(setStatus, (e) => setStatus(errorText(e)))}
+      />
+      <Btn
+        label="Revert test taps"
+        onPress={() => {
+          const day = dayKey(new Date());
+          revertActed([`${day}:water_pace`, `${day}:calorie_pace`], 'ignored');
+          setStatus('reverted water and calorie briefs to ignored');
+        }}
+      />
+      <Btn
+        label="Cancel snoozes"
+        onPress={() => cancelSnoozes().then(setStatus, (e) => setStatus(errorText(e)))}
       />
     </Row>
   );

@@ -15,6 +15,9 @@ const MEAL_NAMES: Record<string, string> = {
   snack: 'a snack',
 };
 const meal = (key: string | number | undefined) => MEAL_NAMES[String(key)] ?? 'your next meal';
+/** The meal as a bare noun, for "a proper …" / "a lighter …" ("snack", not "a snack"). */
+const mealNoun = (key: string | number | undefined) =>
+  key === 'snack' ? 'snack' : (MEAL_NAMES[String(key)] ?? 'meal');
 const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 function mealWindow({ facts: f }: Signal): InsightCopy {
@@ -51,13 +54,13 @@ const COPY: Record<Signal['type'], (s: Signal) => InsightCopy> = {
   protein_pace: proteinPace,
   calorie_pace: ({ facts: f }) => ({
     tagline: 'Running light',
-    line: `About ${f.gap} kcal under for ${f.at}. A proper ${meal(f.next)} makes it up.`,
+    line: `About ${f.gap} kcal under for ${f.at}. A proper ${mealNoun(f.next)} makes it up.`,
     actionLabel: `Log ${meal(f.next)}`,
   }),
   calorie_over: ({ facts: f }) => ({
     tagline: 'Keep it light',
     line: f.left
-      ? `${f.left} kcal left for today. A lighter ${meal(f.next)} keeps you on target.`
+      ? `${f.left} kcal left for today. A lighter ${mealNoun(f.next)} keeps you on target.`
       : 'You’re past today’s target. Something light if you’re hungry, and tomorrow starts fresh.',
     actionLabel: 'Log something light',
   }),

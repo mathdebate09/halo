@@ -135,3 +135,11 @@ export function recordNotification(
 
 /** The stored state of an insight, if it has a row. */
 export const stateOf = (id: string) => findRow(id)?.state ?? null;
+
+/** Dev screen, test phase: puts briefs back to how they were before a test tapped them. */
+export function revertActed(ids: readonly string[], state: 'ignored' | 'shown') {
+  for (const id of ids) {
+    const row = findRow(id);
+    if (row?.state === 'acted') writeState(row, { state, actedAt: null });
+  }
+}

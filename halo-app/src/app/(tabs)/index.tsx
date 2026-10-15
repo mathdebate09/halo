@@ -200,14 +200,16 @@ export default function TodayScreen() {
           </Reveal>
 
           <View className="absolute inset-x-0 items-center px-6" style={{ top: TEXT_AT * height }}>
-            <Reveal index={3} className="items-center">
+            {/* Full width: Android under-measures the serif in a shrink-wrapped box and wraps
+                short taglines ("Water / break"). */}
+            <Reveal index={3} className="w-full items-center">
               {/* New words (tier, time of day, first real score) fade in rather than swap. */}
               <LayoutAnimationConfig skipEntering>
                 <Animated.View
                   key={`${copy.tagline}|${copy.body}`}
                   entering={FadeIn.duration(500).easing(motion.calm)}
-                  className="items-center">
-                  <Text className="text-center font-serif text-[48px] leading-[54px] text-text">
+                  className="w-full items-center">
+                  <Text className="w-full text-center font-serif text-[48px] leading-[54px] text-text">
                     {copy.tagline}
                   </Text>
                   <Text className="mt-3 text-center font-sans text-[17px] leading-[26px] text-text/85">

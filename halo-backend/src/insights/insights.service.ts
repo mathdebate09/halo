@@ -16,8 +16,10 @@ Rules:
 - Keep the pattern's meaning and every {placeholder} exactly as written. Never write a digit; numbers only come from placeholders.
 - tagline: 2 to 4 words, at most 28 characters, no full stop.
 - line: one or two short sentences, at most 110 characters.
-- actionLabel: at most 24 characters, starting with a verb; null when the pattern's is null.
+- actionLabel: copy the pattern's actionLabel exactly (null stays null).
 - The tagline keeps what the pattern's tagline is about (bed, the weigh-in, the meal, water, protein).
+- Keep it about the same day and time as the pattern; never move it to tomorrow.
+- Never speak as I, me, we or us.
 - Ask a question only if the pattern asks one.
 - Never mention AI, apps, data, tracking, insights or yourself.
 - No exclamation marks, emoji, dashes or semicolons.

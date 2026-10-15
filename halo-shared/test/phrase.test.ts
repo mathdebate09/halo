@@ -35,6 +35,12 @@ describe('patterns', () => {
     expect(keepUnits('Bed by 11 pm for your 7.5 h')).toBe('Bed by 11\u00a0pm for your 7.5\u00a0h');
     expect(keepUnits('Hello world')).toBe('Hello world');
   });
+  it('never doubles the article for a snack', () => {
+    const under = { ...protein, type: 'calorie_pace' as const, facts: { gap: 610, at: '11 pm', next: 'snack' } };
+    expect(briefCopy(under).line).toBe('About 610 kcal under for 11 pm. A proper snack makes it up.');
+    const over = { ...protein, type: 'calorie_over' as const, facts: { left: 200, next: 'snack' } };
+    expect(briefCopy(over).line).toBe('200 kcal left for today. A lighter snack keeps you on target.');
+  });
   it('keeps zero flags as branches, not placeholders', () => {
     expect(briefPattern({ ...protein, facts: { ...protein.facts, dinnerLogged: 1 } }).line).toBe(
       'About {gap} g short for {at}. Greek yogurt with berries closes most of it.',
@@ -67,9 +73,16 @@ describe('phrase guard', () => {
       'About {gap} g short for {at} 💪',
       'Your data shows {gap} g short at {at}.',
       'No pressure, {gap} g short for {at}.',
+      'Tell me if {gap} g short for {at} is right.',
+      'We are {gap} g short for {at}.',
     ]) {
       expect(phraseProblem(pattern, { ...ok, line }), line).not.toBeNull();
     }
+  });
+  it('keeps the brief on the day it is about', () => {
+    expect(phraseProblem(pattern, { ...ok, line: 'About {gap} g short for {at}. Make it up tomorrow.' })).toBe(
+      'moved to tomorrow',
+    );
   });
   it('keeps questions and actions only where the template had them', () => {
     expect(phraseProblem(pattern, { ...ok, line: 'Short {gap} g by {at}?' })).toBe('question');

@@ -86,7 +86,11 @@ export function wordsFor(insight: Insight, key: string | null): InsightCopy {
   const cached = key ? readPhrase(key) : null;
   // Re-checked on every read, so a stricter guard also retires words cached under an older one.
   if (!cached || phraseProblem(briefPattern(insight), cached)) return insight.copy;
-  return fillPattern(cached, insight.facts);
+  return {
+    ...fillPattern(cached, insight.facts),
+    // Button labels stay the template's: they name what the button does.
+    actionLabel: insight.copy.actionLabel,
+  };
 }
 
 // One request at a time, batched, debounced; each key asked at most once per app session.
@@ -169,5 +173,9 @@ export function useBriefWords(brief: Brief, phrase: string | null): InsightCopy 
   const cached = useMemo(() => (phrase ? readPhrase(phrase) : null), [phrase, epoch]);
   const { insight } = brief;
   if (!cached || phraseProblem(briefPattern(insight), cached)) return insight.copy;
-  return fillPattern(cached, insight.facts);
+  return {
+    ...fillPattern(cached, insight.facts),
+    // Button labels stay the template's: they name what the button does.
+    actionLabel: insight.copy.actionLabel,
+  };
 }
