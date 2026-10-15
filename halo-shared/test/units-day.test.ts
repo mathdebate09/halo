@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { addDays, dayKey, dayStart, formatClock, hourOfDay } from '../src/day';
+import { addDays, dayHour, dayKey, dayStart, formatClock, hourOfDay } from '../src/day';
 import {
   cmToFtIn,
   defaultUnits,
@@ -67,5 +67,14 @@ describe('formatClock', () => {
       '10:30 pm',
       '12:30 am',
     ]);
+  });
+});
+
+describe('dayHour', () => {
+  it('carries the day past midnight until the 4 am rollover', () => {
+    expect(dayHour(new Date(2026, 9, 16, 0, 30))).toBe(24.5);
+    expect(dayHour(new Date(2026, 9, 16, 3, 59))).toBeCloseTo(27.98, 1);
+    expect(dayHour(new Date(2026, 9, 16, 4, 0))).toBe(4);
+    expect(dayHour(new Date(2026, 9, 15, 23, 0))).toBe(23);
   });
 });

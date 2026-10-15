@@ -24,6 +24,15 @@ export function addDays(key: string, days: number): string {
   return `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`;
 }
 
+/**
+ * The hour within the app's day: wall-clock hours, carried past midnight until the 4 am rollover
+ * (00:30 → 24.5), so pace and meal windows don't restart at midnight.
+ */
+export function dayHour(date: Date, rolloverHour = ROLLOVER_HOUR): number {
+  const h = hourOfDay(date);
+  return h < rolloverHour ? h + 24 : h;
+}
+
 /** Wall-clock hour as a fraction (13:30 → 13.5). */
 export const hourOfDay = (date: Date) =>
   date.getHours() + date.getMinutes() / 60 + date.getSeconds() / 3600;

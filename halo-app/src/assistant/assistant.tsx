@@ -16,8 +16,8 @@ import {
   bedtimeOf,
   brief,
   type Brief,
+  dayHour,
   dayStart,
-  hourOfDay,
   nightShape,
   type PaContext,
   transitions,
@@ -175,7 +175,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const context: PaContext = {
     now: now.getTime(),
     day,
-    hour: hourOfDay(now),
+    hour: dayHour(now),
     // Last night from Health Connect, else the screen's estimate (the PA only; scores wait for 18).
     facts: { ...facts, sleepHours: facts.sleepHours ?? nightsByDay.get(day)?.hours ?? null },
     windows: windowsOn(day, learned),

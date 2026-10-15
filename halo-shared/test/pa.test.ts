@@ -218,6 +218,25 @@ describe('wake-time ask', () => {
   });
 });
 
+describe('after midnight, before the rollover', () => {
+  it('keeps judging the same day: no breakfast talk, no over-eating from a reset pace', () => {
+    // 00:30 is hour 24.5 of the day that started at 4 am; nothing is due any more.
+    const b = brief({
+      ...ctx(0, 30, { wake: { value: 11, source: 'estimated', via: 'screen' } }, {
+        mealsLogged: 3,
+        loggedTypes: ['breakfast', 'lunch', 'dinner'],
+        due: 1,
+        dayFraction: 1,
+        waterMl: 2500,
+        intake: { kcal: 1390, proteinG: 120, carbsG: 150, fatG: 50 },
+      }),
+      hour: 24.5,
+    });
+    expect(b.trace.signals.map((s) => s.type)).not.toContain('calorie_over');
+    expect(JSON.stringify(b.insight.copy)).not.toMatch(/breakfast/);
+  });
+});
+
 describe('device clock', () => {
   it('writes times in am/pm when the device uses a 12-hour clock', () => {
     const b = brief(

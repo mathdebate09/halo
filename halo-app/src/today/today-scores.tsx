@@ -24,7 +24,7 @@ import {
   expectedDayFraction,
   expectedIntakeFraction,
   EXERCISE_GOAL_MIN,
-  hourOfDay,
+  dayHour,
   overallScore,
   type Score,
   stepGoalFor,
@@ -137,7 +137,8 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
     [day],
   );
 
-  const hour = hourOfDay(now);
+  // Hours carry on past midnight until the 4 am rollover (00:30 is 24.5 of the same day).
+  const hour = dayHour(now);
 
   const targetKcal = plan?.targetKcal ?? 2000;
   const targetProteinG = plan?.proteinG ?? 100;
@@ -147,7 +148,7 @@ export function TodayScoresProvider({ children }: { children: ReactNode }) {
   const diet = dietScore({
     meals: mealRows.map((m) => ({
       mealType: m.mealType,
-      hour: hourOfDay(new Date(m.eatenAt)),
+      hour: dayHour(new Date(m.eatenAt)),
       kcal: num(m.kcal),
       proteinG: num(m.proteinG),
       carbsG: num(m.carbsG),
