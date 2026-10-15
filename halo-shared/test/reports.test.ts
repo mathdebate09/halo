@@ -287,6 +287,15 @@ describe('mergeReport', () => {
     expect(egfr).toMatchObject({ metric: 'lab:egfr', label: 'eGFR', unit: 'mL/min/1.73m2', value: 118, refLo: 90, refHi: null });
   });
 
+  it('gives an unrecognised test the same key however the model words it', () => {
+    const metric = (name: string) => mergeReport([page([entry({ name, value: 24, unit: 'U/L' })])]).values[0]!.metric;
+    expect(metric('AST (SGOT)')).toBe('lab:ast');
+    expect(metric('AST')).toBe('lab:ast');
+    expect(metric('C-Reactive Protein (CRP)')).toBe(metric('C-reactive protein'));
+    expect(metric('RBC Count')).toBe(metric('RBC count'));
+    expect(metric('(CRP)')).toBe('lab:crp');
+  });
+
   it('keeps a result read twice (tile overlap) once, the surer reading', () => {
     const { values } = mergeReport([
       page([entry({ name: 'Ferritin', value: 96, unit: 'ng/mL', confidence: 0.7 }), entry({ name: 'Ferritin', value: 96, unit: 'ng/mL', confidence: 0.9 })]),

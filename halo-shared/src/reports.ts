@@ -575,7 +575,12 @@ export type MergedReport = {
 /** Below this the confirm step marks a value to check. */
 export const CHECK_CONFIDENCE = 0.6;
 
-const slug = (name: string) => nameKey(name).replace(/ /g, '_').slice(0, 40) || 'result';
+/**
+ * The key of an analyte we don't recognise. Without "(…)": the model words the same test
+ * differently from one report to the next ("AST (SGOT)", "AST"), and a trend needs one key.
+ */
+const slug = (name: string) =>
+  (nameKey(name.replace(/\([^)]*\)/g, ' ')) || nameKey(name)).replace(/ /g, '_').slice(0, 40) || 'result';
 
 export function labLabel(metric: string, label: string): string {
   return isAnalyteKey(metric) ? ANALYTES[metric].label : label;
