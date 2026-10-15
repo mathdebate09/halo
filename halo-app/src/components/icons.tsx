@@ -354,3 +354,28 @@ export function HikeIcon(props: IconProps) {
     </Line>
   );
 }
+
+export function HeartIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.3a4.3 4.3 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20z" />
+    </Line>
+  );
+}
+
+export function PhoneIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M8.5 3h7A1.5 1.5 0 0 1 17 4.5v15a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 19.5v-15A1.5 1.5 0 0 1 8.5 3zM11 18h2" />
+    </Line>
+  );
+}
+
+/** Two four-point stars: the Advisor's mark. */
+export function SparkleIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M10 4.5c.5 3.6 2 5.1 5.5 5.5-3.5.4-5 1.9-5.5 5.5-.5-3.6-2-5.1-5.5-5.5 3.5-.4 5-1.9 5.5-5.5zM17.5 14c.3 1.8 1 2.6 2.5 2.8-1.5.2-2.2 1-2.5 2.7-.3-1.7-1-2.5-2.5-2.7 1.5-.2 2.2-1 2.5-2.8z" />
+    </Line>
+  );
+}
