@@ -11,6 +11,7 @@ export * from './moments.js';
 export * from './pa.js';
 export * from './phrase.js';
 export * from './plan.js';
+export * from './reports.js';
 export * from './scoring.js';
 export * from './signals.js';
 export * from './sleep.js';

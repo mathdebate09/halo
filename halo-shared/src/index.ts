@@ -9,6 +9,7 @@ export * from './moments';
 export * from './pa';
 export * from './phrase';
 export * from './plan';
+export * from './reports';
 export * from './scoring';
 export * from './signals';
 export * from './sleep';
