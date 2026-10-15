@@ -2,7 +2,14 @@
 // on track (or still an early read) the tier's own line does, picked by day, tier and time of day
 // so the words stay put between renders.
 
-import { type Brief, type DaySlot, type InsightCopy, slotFor, type Tier } from '@/shared';
+import {
+  type Brief,
+  type DaySlot,
+  type InsightCopy,
+  keepUnits,
+  slotFor,
+  type Tier,
+} from '@/shared';
 
 type Copy = { tagline: string; body: string };
 
@@ -159,6 +166,10 @@ export function todayCopy(tier: Tier, day: string, hour: number, provisional: bo
  */
 export function briefCopy(brief: Brief, words: InsightCopy, tier: Copy): Copy {
   const { insight, lead } = brief;
-  if (insight.type === 'on_track') return lead ? { tagline: tier.tagline, body: lead } : tier;
-  return { tagline: words.tagline, body: lead ? `${lead} ${words.line}` : words.line };
+  if (insight.type === 'on_track')
+    return lead ? { tagline: tier.tagline, body: keepUnits(lead) } : tier;
+  return {
+    tagline: keepUnits(words.tagline),
+    body: keepUnits(lead ? `${lead} ${words.line}` : words.line),
+  };
 }

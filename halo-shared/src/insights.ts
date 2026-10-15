@@ -39,6 +39,7 @@ export type NextAction =
   | { kind: 'connect' }
   | { kind: 'weigh' }
   | { kind: 'ask_wake' }
+  | { kind: 'usage_access' }
   | null;
 
 export type Panel = {

@@ -2,9 +2,9 @@
 // stored insight history), asks halo-shared's `brief` for the one thing worth saying, and keeps
 // the loop closed (shown → acted / resolved / ignored). Mounted inside TodayScoresProvider.
 
-import { and, desc, eq, gte, isNull, max } from 'drizzle-orm';
+import { and, desc, eq, gte, isNotNull, isNull, max } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { createContext, type ReactNode, use, useEffect, useRef } from 'react';
+import { createContext, type ReactNode, use, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { useMMKVBoolean } from 'react-native-mmkv';
 
@@ -18,6 +18,7 @@ import {
   type Brief,
   dayStart,
   hourOfDay,
+  nightShape,
   type PaContext,
   transitions,
   weighInDue,
@@ -38,6 +39,7 @@ import {
 } from './learned';
 import { applyTransitions, useInsightHistory } from './loop-store';
 import { reschedule } from './notify';
+import { refreshScreenNights, type UsageAccess, usageAccess, useScreenNights } from './screen';
 import { phraseItemFor, readPhrase, requestPhrases } from './phrasing';
 
 /** The brief on screen, kept across renders and restarts so it doesn't flip (PA hold). */
@@ -80,13 +82,21 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   useDailyScoreWriter(scores);
 
   // Learn on launch, on every return to the foreground, and when meals come in.
+  // Usage access can change in Settings while Halo is away, so it's re-read on every return.
+  const [access, setAccess] = useState<UsageAccess>(usageAccess);
   useEffect(() => {
-    noteAppOpen();
-    refreshLearned();
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') return;
+    const learn = () => {
       noteAppOpen();
       refreshLearned();
+      setAccess(usageAccess());
+      refreshScreenNights().then(
+        () => refreshLearned(),
+        () => {},
+      );
+    };
+    learn();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') learn();
     });
     return () => sub.remove();
   }, []);
@@ -117,13 +127,30 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       .where(and(eq(water.day, day), isNull(water.deletedAt))),
     [day],
   );
-  const { data: prevNight } = useLiveQuery(
+  // Nights: Health Connect where it has them, the screen's estimate for the rest.
+  const { data: hcNights } = useLiveQuery(
     db
-      .select({ sleepMin: hcDaily.sleepMin })
+      .select({
+        day: hcDaily.day,
+        start: hcDaily.sleepStart,
+        end: hcDaily.sleepEnd,
+        minutes: hcDaily.sleepMin,
+      })
       .from(hcDaily)
-      .where(eq(hcDaily.day, addDays(day, -1))),
+      .where(and(gte(hcDaily.day, addDays(day, -14)), isNotNull(hcDaily.sleepEnd))),
     [day],
   );
+  const screenNights = useScreenNights();
+  const nightsByDay = new Map<string, { start: number; end: number; hours: number }>();
+  for (const n of hcNights) {
+    if (n.start == null || n.end == null || n.minutes == null) continue;
+    nightsByDay.set(n.day, { start: n.start, end: n.end, hours: n.minutes / 60 });
+  }
+  for (const n of screenNights) if (!nightsByDay.has(n.day)) nightsByDay.set(n.day, n);
+  const nights = [...nightsByDay.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, 14)
+    .map(([d, n]) => nightShape(n, isWeekend(d)));
 
   // The last two weeks of daily scores (ids are day keys): this week against the one before.
   const { data: scoreRows } = useLiveQuery(
@@ -141,20 +168,21 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const logTimes = [num(lastMeal[0]?.at), num(lastWater[0]?.at)].filter(
     (n): n is number => n != null,
   );
-  const prevMin = prevNight[0]?.sleepMin;
+  const prevNightHours = nightsByDay.get(addDays(day, -1))?.hours ?? null;
 
   const context: PaContext = {
     now: now.getTime(),
     day,
     hour: hourOfDay(now),
-    facts,
+    // Last night from Health Connect, else the screen's estimate (the PA only; scores wait for 18).
+    facts: { ...facts, sleepHours: facts.sleepHours ?? nightsByDay.get(day)?.hours ?? null },
     windows: windowsOn(day, learned),
     wake: learned
       ? weekend
         ? learned.wake.weekend
         : learned.wake.weekday
       : { value: 7, source: 'assumed' },
-    prevNightHours: prevMin == null ? null : prevMin / 60,
+    prevNightHours,
     usualMeals: learned?.usualMeals ?? {},
     weighedToday: lastWeighDay === day,
     lastWeighDay,
@@ -163,6 +191,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     daysSinceInstall: installed ? daysBetween(installed, day) : 0,
     wakeAsked: !!wakeAskDone,
     week: weekStats(scoreRows, day),
+    nights,
+    sleepSource: hcNights.length ? 'health' : screenNights.length ? 'screen' : 'none',
+    usageAccess: access,
   };
 
   const heldId = kv.getString(HELD_KEY) ?? null;
@@ -193,6 +224,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     context.lastLogAt,
     learned?.updatedAt,
     wakeAskDone,
+    access,
+    screenNights.length,
   ].join('|');
   useEffect(() => {
     const timer = setTimeout(() => {

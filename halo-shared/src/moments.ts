@@ -43,6 +43,8 @@ export const CHANNEL_OF: Record<InsightKind, NotifyChannel> = {
   sleep_debt: 'sleep',
   bedtime: 'sleep',
   wake_ask: 'review',
+  usage_ask: 'review',
+  sleep_pattern: 'sleep',
   weekly_review: 'review',
   quiet_days: 'review',
   on_track: 'review',

@@ -32,6 +32,7 @@ const DAYTIME: readonly InsightKind[] = [
   'water_pace',
   'weigh_in',
   'wake_ask',
+  'usage_ask',
 ];
 
 export type Dropped = { id: string; type: InsightKind; reason: string };

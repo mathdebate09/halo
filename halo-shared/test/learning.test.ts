@@ -87,7 +87,7 @@ describe('wake chain', () => {
   it('then the user’s answer, then first app opens, then 07:00', () => {
     expect(learnWake({ measured: [], asked: 8, firstOpens: [] }, false).source).toBe('asked');
     const opens = [sample(7.5), sample(8), sample(8.5), sample(2)];
-    expect(learnWake({ measured: [], firstOpens: opens }, false)).toEqual({ value: 8, source: 'estimated' });
+    expect(learnWake({ measured: [], firstOpens: opens }, false)).toEqual({ value: 8, source: 'estimated', via: 'app' });
     expect(learnWake({ measured: [], firstOpens: [] }, false)).toEqual({ value: 7, source: 'assumed' });
   });
 });

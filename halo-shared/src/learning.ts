@@ -8,7 +8,8 @@ import { clamp } from './units';
 
 /** Where a learned value came from, best first (SPEC §6 labels). */
 export type Source = 'measured' | 'asked' | 'estimated' | 'assumed';
-export type Learned<T> = { value: T; source: Source };
+/** `via` names the estimate's evidence: the screen going dark overnight, or the first app open. */
+export type Learned<T> = { value: T; source: Source; via?: 'screen' | 'app' };
 
 /** One logged meal, as the learner needs it. `hour` is wall-clock (13.5 = 13:30). */
 export type MealSample = {
@@ -115,6 +116,8 @@ export type WakeSample = { hour: number; weekend: boolean };
 export type WakeInput = {
   /** Health Connect sleep ends (last 14 nights). */
   measured: readonly WakeSample[];
+  /** Ends of the overnight screen-off stretch (Usage access). */
+  screen?: readonly WakeSample[];
   /** The user's answer to the day-3 ask. */
   asked?: number | null;
   /** First app open of each recent day, between 04:00 and 12:00. */
@@ -122,13 +125,17 @@ export type WakeInput = {
 };
 
 /**
- * Typical wake time through the chain (SPEC §6): Health Connect → the user's own answer → first
- * app open of the day → assumed 07:00. Weekdays and weekends are learned apart where possible.
+ * Typical wake time through the chain (SPEC §6): Health Connect → the screen coming back on after
+ * the night → the user's own answer → first app open of the day → assumed 07:00. Weekdays and weekends are learned apart where possible.
  */
 export function learnWake(input: WakeInput, weekend: boolean): Learned<number> {
   const measured = sameKind(input.measured, weekend).slice(0, 7);
   if (measured.length >= MIN_SAMPLES) {
     return { value: median(measured.map((s) => s.hour))!, source: 'measured' };
+  }
+  const screen = sameKind(input.screen ?? [], weekend).slice(0, 7);
+  if (screen.length >= MIN_SAMPLES) {
+    return { value: median(screen.map((s) => s.hour))!, source: 'estimated', via: 'screen' };
   }
   if (input.asked != null) return { value: input.asked, source: 'asked' };
   const opens = sameKind(
@@ -136,7 +143,7 @@ export function learnWake(input: WakeInput, weekend: boolean): Learned<number> {
     weekend,
   ).slice(0, 7);
   if (opens.length >= MIN_SAMPLES) {
-    return { value: median(opens.map((s) => s.hour))!, source: 'estimated' };
+    return { value: median(opens.map((s) => s.hour))!, source: 'estimated', via: 'app' };
   }
   return { value: ASSUMED_WAKE_HOUR, source: 'assumed' };
 }

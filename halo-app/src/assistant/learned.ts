@@ -25,6 +25,8 @@ import {
   type WakeSample,
 } from '@/shared';
 
+import { readScreenNights } from './screen';
+
 const LEARNED_KEY = 'assistant.learned';
 const FIRST_OPENS_KEY = 'assistant.firstOpens';
 /** The user's answer to the day-3 wake-time ask (chunk 17b), as an hour. */
@@ -114,8 +116,12 @@ export function refreshLearned(now = new Date()) {
   const firstOpens: WakeSample[] = (
     readJson<{ day: string; hour: number }[]>(FIRST_OPENS_KEY) ?? []
   ).map((o) => ({ hour: o.hour, weekend: isWeekend(o.day) }));
+  const screen: WakeSample[] = readScreenNights().map((n) => ({
+    hour: hourOfDay(new Date(n.end)),
+    weekend: isWeekend(n.day),
+  }));
   const asked = kv.getNumber(WAKE_ASKED_KEY) ?? null;
-  const wakeInput = { measured, asked, firstOpens };
+  const wakeInput = { measured, screen, asked, firstOpens };
 
   const state: LearnedState = {
     windows: learnMealWindows(samples),

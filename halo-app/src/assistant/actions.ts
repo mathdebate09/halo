@@ -7,10 +7,12 @@ import { addWater } from '@/lib/water';
 import type { NextAction } from '@/shared';
 
 import { markActed } from './loop-store';
+import { openUsageAccess } from './screen';
 
 /**
  * Does the step: logs water now (its toast carries Undo), opens the logger pre-filled, opens the
- * weigh-in sheet at the last weight, asks the wake time, or connects a missing source. Marks the
+ * weigh-in sheet at the last weight, asks the wake time, opens Usage access, or connects a
+ * missing source. Marks the
  * brief acted when it came from one.
  */
 export async function runAction(action: NextAction, briefId?: string | null) {
@@ -28,6 +30,9 @@ export async function runAction(action: NextAction, briefId?: string | null) {
       return;
     case 'ask_wake':
       router.push('/wake-time');
+      return;
+    case 'usage_access':
+      openUsageAccess();
       return;
     case 'connect':
       await connectHealthConnect();

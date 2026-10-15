@@ -90,6 +90,22 @@ const COPY: Record<Signal['type'], (s: Signal) => InsightCopy> = {
     line: 'One answer sets your weigh-in and bedtime.',
     actionLabel: 'Set wake time',
   }),
+  usage_ask: () => ({
+    tagline: 'Sleep without a tracker',
+    line: 'Allow Usage access and Halo reads when your screen went dark overnight. Nothing else.',
+    actionLabel: 'Allow',
+  }),
+  sleep_pattern: ({ facts: f }) => ({
+    tagline:
+      f.flag === 'short' ? 'Short nights lately' : f.flag === 'late' ? 'Late nights lately' : 'Weekends drift',
+    line:
+      f.flag === 'short'
+        ? `About ${f.hours} h a night lately. Lights out at ${f.tonight} tonight gets you closer.`
+        : f.flag === 'late'
+          ? `Lights out has been around ${f.usual}. Try ${f.tonight} tonight, then a little earlier every few days.`
+          : `Weekend nights run about ${f.drift} h later than weekdays. Within an hour makes Mondays easier.`,
+    actionLabel: null,
+  }),
   weekly_review: ({ facts: f }) => ({
     tagline: 'Your week',
     line:
@@ -137,6 +153,10 @@ const fillText = (text: string, facts: InsightFacts) =>
     // Same number format as Learn more's figures ("1,250").
     return typeof value === 'number' ? value.toLocaleString('en-GB') : value;
   });
+
+/** For display: a number keeps its unit on the same line ("7.5 h", "11 pm", "40 g"). */
+export const keepUnits = (text: string) =>
+  text.replace(/(\d) (h|g|ml|kcal|am|pm)\b/g, '$1\u00a0$2');
 
 /** Fills a pattern's placeholders from the facts. */
 export function fillPattern(pattern: InsightCopy, facts: InsightFacts): InsightCopy {

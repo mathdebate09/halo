@@ -4,7 +4,7 @@
 // Halo has learned about the user. Each rule only says what it sees; none of them decides what
 // reaches the user. That is the PA's job (pa.ts).
 
-import { dayStart, formatClock } from './day';
+import { addDays, dayStart, formatClock } from './day';
 import {
   behind,
   type DayFacts,
@@ -24,6 +24,7 @@ import {
   wrapHour,
 } from './learning';
 import type { MealType, MealWindows } from './scoring';
+import { type NightShape, sleepPattern } from './sleep';
 import { clamp, round } from './units';
 
 export const INSIGHT_KINDS = [
@@ -36,6 +37,8 @@ export const INSIGHT_KINDS = [
   'sleep_debt',
   'bedtime',
   'wake_ask',
+  'usage_ask',
+  'sleep_pattern',
   'weekly_review',
   'quiet_days',
   'on_track',
@@ -111,6 +114,12 @@ export type PaContext = {
   wakeAsked?: boolean;
   /** Overall scores of the last seven days (today included) and the seven before. */
   week?: WeekStats | null;
+  /** Recent nights (Health Connect, else the screen), newest first. */
+  nights?: readonly NightShape[];
+  /** Where nights come from: Health Connect, the screen (Usage access), or nowhere yet. */
+  sleepSource?: 'health' | 'screen' | 'none';
+  /** Usage access: granted, not granted, or not in this build. */
+  usageAccess?: 'granted' | 'denied' | 'unavailable';
 };
 
 export type WeekStats = { days: number; avg: number; prevAvg: number | null };
@@ -132,8 +141,16 @@ export function atHour(ctx: Pick<PaContext, 'now' | 'hour'>, hour: number): numb
   return ctx.now + wrapHour(hour - ctx.hour) * HOUR_MS;
 }
 
-export const bedtimeOf = (ctx: PaContext): Bedtime =>
-  bedtimeFor(ctx.wake.value, ctx.facts.sleepNeedHours, ctx.facts.sleepHours);
+/**
+ * Tonight's bedtime. Normally the healthy one (wake − need − wind-down). When nights have been
+ * running late, it's one 15-minute step earlier than usual instead: a target that can be met.
+ */
+export function bedtimeOf(ctx: PaContext): Bedtime {
+  const ideal = bedtimeFor(ctx.wake.value, ctx.facts.sleepNeedHours, ctx.facts.sleepHours);
+  const pattern = ctx.nights ? sleepPattern(ctx.nights, ideal.hour) : null;
+  if (pattern?.flag !== 'late') return ideal;
+  return { hour: wrapHour(pattern.tonight), pulled: ideal.pulled };
+}
 
 /** From half an hour before bedtime until the usual wake time: no food, water or scale talk. */
 export const isLate = (ctx: PaContext) =>
@@ -328,7 +345,9 @@ function sleep(ctx: PaContext): Signal | null {
 /** Day 3 and still guessing the wake time: ask once (SPEC §4 "Learning"). */
 function wakeAsk(ctx: PaContext): Signal | null {
   if (ctx.wakeAsked || (ctx.daysSinceInstall ?? 0) < 2) return null;
-  if (ctx.wake.source === 'measured' || ctx.wake.source === 'asked') return null;
+  if (ctx.wake.source === 'measured' || ctx.wake.source === 'asked' || ctx.wake.via === 'screen') {
+    return null;
+  }
   return {
     id: `${ctx.day}:wake_ask`,
     type: 'wake_ask',
@@ -338,6 +357,57 @@ function wakeAsk(ctx: PaContext): Signal | null {
     expiresAt: atHour(ctx, bedtimeOf(ctx).hour - 0.5),
     tab: null,
     facts: {},
+  };
+}
+
+/** Asked on at most this many days, then dropped for good. */
+const USAGE_ASK_DAYS = 3;
+
+/** No Health Connect sleep: offer the screen as a sleep source, in context, a few times at most. */
+function usageAsk(ctx: PaContext): Signal | null {
+  if (ctx.sleepSource !== 'none' || ctx.usageAccess !== 'denied') return null;
+  const askedDays = new Set(ctx.history.filter((r) => r.type === 'usage_ask').map((r) => r.day));
+  if (askedDays.size >= USAGE_ASK_DAYS && !askedDays.has(ctx.day)) return null;
+  return {
+    id: `${ctx.day}:usage_ask`,
+    type: 'usage_ask',
+    severity: 32,
+    reason: 'Bedtime and quiet hours follow your real nights.',
+    action: { kind: 'usage_access' },
+    expiresAt: atHour(ctx, bedtimeOf(ctx).hour - 0.5),
+    tab: null,
+    facts: {},
+  };
+}
+
+/** Every three days at most: say so when nights run short, late or drift on weekends. */
+function sleepPatternBrief(ctx: PaContext): Signal | null {
+  if (!ctx.nights) return null;
+  const ideal = bedtimeFor(ctx.wake.value, ctx.facts.sleepNeedHours, null);
+  const pattern = sleepPattern(ctx.nights, ideal.hour);
+  if (!pattern) return null;
+  const bed = bedtimeOf(ctx);
+  if (ctx.hour < 19 || !inSpan(ctx.hour, 19, bed.hour - 1.5)) return null;
+  const recent = ctx.history.some(
+    (r) => r.type === 'sleep_pattern' && r.day > addDays(ctx.day, -3) && r.day !== ctx.day,
+  );
+  if (recent) return null;
+  return {
+    id: `${ctx.day}:sleep_pattern`,
+    type: 'sleep_pattern',
+    severity: 35,
+    reason: 'Steady, long enough nights make hunger and energy easier to manage.',
+    action: null,
+    expiresAt: atHour(ctx, bed.hour - 1.5),
+    tab: 'sleep',
+    facts: {
+      flag: pattern.flag,
+      hours: round(pattern.hours, 1),
+      // Quarter hours: the step is 15 minutes, so half-hour rounding would hide it.
+      usual: formatClock(Math.round(pattern.usualBed * 4) / 4, ctx.facts.clock24),
+      tonight: formatClock(Math.round(pattern.tonight * 4) / 4, ctx.facts.clock24),
+      drift: round(pattern.drift, 1),
+    },
   };
 }
 
@@ -405,6 +475,8 @@ export function detectSignals(ctx: PaContext, weighDue: boolean): Signal[] {
     weighIn(ctx, weighDue),
     sleep(ctx),
     wakeAsk(ctx),
+    usageAsk(ctx),
+    sleepPatternBrief(ctx),
     weeklyReview(ctx),
   ].filter((s): s is Signal => s != null);
 }

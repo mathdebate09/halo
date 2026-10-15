@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { briefCopy, briefPattern, fillPattern } from '../src/brief-copy';
+import { briefCopy, briefPattern, fillPattern, keepUnits } from '../src/brief-copy';
 import { phraseKey, phraseProblem, slotFor } from '../src/phrase';
 import type { Signal } from '../src/signals';
 
@@ -30,6 +30,10 @@ describe('patterns', () => {
   it('formats large numbers the way the panel does', () => {
     const water = { ...protein, type: 'water_pace' as const, facts: { gap: 1250, at: '6 pm' } };
     expect(briefCopy(water).line).toBe('About 1,250 ml behind for 6 pm. A glass now helps.');
+  });
+  it('keeps numbers with their units for display', () => {
+    expect(keepUnits('Bed by 11 pm for your 7.5 h')).toBe('Bed by 11\u00a0pm for your 7.5\u00a0h');
+    expect(keepUnits('Hello world')).toBe('Hello world');
   });
   it('keeps zero flags as branches, not placeholders', () => {
     expect(briefPattern({ ...protein, facts: { ...protein.facts, dinnerLogged: 1 } }).line).toBe(
@@ -105,6 +109,8 @@ describe('templates are valid rewordings of themselves (apart from being unchang
     sleep_debt: { at: '22:30', slept: 5.6, need: 7.5 },
     bedtime: { at: '22:30', slept: 5.6, need: 7.5, pulled: 1 },
     wake_ask: {},
+    usage_ask: {},
+    sleep_pattern: { flag: 'late', hours: 6.1, usual: '01:30', tonight: '01:15', drift: 0 },
     weekly_review: { avg: 74, days: 7, delta: 6, trend: 'down' },
     quiet_days: {},
     on_track: {},

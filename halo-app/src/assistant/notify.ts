@@ -19,6 +19,7 @@ import {
   type Goal,
   hourOfDay,
   inSpan,
+  keepUnits,
   type NotifyChannel,
   NOTIFY_CHANNELS,
   type NextAction,
@@ -39,6 +40,9 @@ const SUPPRESSED_KEY = 'notify.suppressed';
 const HANDLED_KEY = 'notify.handled';
 /** The latest dev test response, for the dev screen. */
 export const LAST_RESPONSE_KEY = 'notify.lastResponse';
+
+/** Button actions that never open the app: only the background task handles them. */
+const BACKGROUND_ACTIONS = new Set(['water', 'later']);
 
 const HOUR_MS = 3_600_000;
 const KEEP_DELIVERED_MS = 3 * 24 * HOUR_MS;
@@ -246,7 +250,9 @@ export async function handleResponse(
 export function useNotificationResponses() {
   const last = Notifications.useLastNotificationResponse();
   useEffect(() => {
-    if (last) void handleResponse(last, true);
+    // Buttons that don't open the app run in the background task, in another process whose
+    // "handled" note this one can't see; handling them here too would log water twice.
+    if (last && !BACKGROUND_ACTIONS.has(last.actionIdentifier)) void handleResponse(last, true);
   }, [last]);
 }
 
@@ -347,8 +353,8 @@ export async function reschedule(ctx: PaContext, tier: Tier, goal: Goal) {
       const item = phraseItemFor(m.insight, tier, hourOfDay(new Date(m.at)), goal);
       if (item) items.push(item);
       const words = wordsFor(m.insight, item?.key ?? null);
-      const title = words.tagline;
-      const body = m.lead ? `${m.lead} ${words.line}` : words.line;
+      const title = keepUnits(words.tagline);
+      const body = keepUnits(m.lead ? `${m.lead} ${words.line}` : words.line);
       const insight: NotifiedInsight = {
         id: m.insight.id,
         day: m.day,

@@ -12,5 +12,6 @@ export * from './phrase';
 export * from './plan';
 export * from './scoring';
 export * from './signals';
+export * from './sleep';
 export * from './sync';
 export * from './units';

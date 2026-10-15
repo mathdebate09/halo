@@ -12,5 +12,6 @@ export * from './phrase.js';
 export * from './plan.js';
 export * from './scoring.js';
 export * from './signals.js';
+export * from './sleep.js';
 export * from './sync.js';
 export * from './units.js';

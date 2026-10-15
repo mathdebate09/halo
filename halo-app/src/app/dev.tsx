@@ -37,6 +37,12 @@ import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 
 import { TRACE_KEY } from '@/assistant/assistant';
 import { LAST_RESPONSE_KEY, readScheduled, sendTestOfNext } from '@/assistant/notify';
+import {
+  openUsageAccess,
+  refreshScreenNights,
+  usageAccess,
+  useScreenNights,
+} from '@/assistant/screen';
 import { HeroBackdrop } from '@/components/hero-backdrop';
 import { ThemedScreen } from '@/components/themed-screen';
 import { useHaloTheme } from '@/theme/theme-provider';
@@ -227,6 +233,30 @@ function AssistantRow() {
   return <Row title="Assistant (PA trace)" status={lines.join('\n')} />;
 }
 
+/** Usage access and the nights read from the screen (chunk 17c). */
+function ScreenTimeRow() {
+  const nights = useScreenNights();
+  const [access, setAccess] = useState(usageAccess);
+  const lines = nights
+    .slice(0, 7)
+    .map(
+      (n) =>
+        `${n.day}: ${formatTime(new Date(n.start))} → ${formatTime(new Date(n.end))} · ${n.hours.toFixed(1)} h`,
+    );
+  return (
+    <Row title="Screen time (sleep)" status={[`access ${access}`, ...lines].join('\n')}>
+      <Btn label="Open Usage access" onPress={openUsageAccess} />
+      <Btn
+        label="Read nights now"
+        onPress={() => {
+          setAccess(usageAccess());
+          refreshScreenNights(true);
+        }}
+      />
+    </Row>
+  );
+}
+
 /** The notification plan (read-only) and a test send that changes nothing when answered. */
 function NotifyPlanRow() {
   const [status, setStatus] = useState('');
@@ -361,6 +391,7 @@ export default function DevScreen() {
         <TodayRow />
         <AssistantRow />
         <NotifyPlanRow />
+        <ScreenTimeRow />
         <StoreRow />
         <SyncRow />
 
