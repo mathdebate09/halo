@@ -55,8 +55,9 @@ import { ThemedScreen } from '@/components/themed-screen';
 import { useHaloTheme } from '@/theme/theme-provider';
 import { db } from '@/db/client';
 import { deleteRecord, upsertRecord } from '@/db/mutate';
-import { outbox, water } from '@/db/schema';
+import { hcDaily, outbox, water } from '@/db/schema';
 import { formatTime } from '@/lib/clock';
+import { connectHealthConnect, refreshHealthData } from '@/lib/health-connect';
 import { getDevice } from '@/lib/device';
 import { kv } from '@/lib/kv';
 import { ScreenTimeCard } from '@/onboarding/screen-time-card';
@@ -619,6 +620,35 @@ export default function DevScreen() {
                 },
               });
               return `${res.COUNT_TOTAL} steps (${res.dataOrigins.join(', ') || 'no sources'})`;
+            })}
+          />
+          <Btn
+            label="Ask all types"
+            onPress={run('hc', async () => {
+              const status = await connectHealthConnect();
+              await refreshHealthData(true);
+              return status;
+            })}
+          />
+          <Btn
+            label="Latest extras"
+            onPress={run('hc', async () => {
+              const rows = await db.select().from(hcDaily).orderBy(desc(hcDaily.day)).limit(14);
+              const keys = [
+                'respRate',
+                'bodyTempC',
+                'bodyFatPct',
+                'vo2max',
+                'weightKg',
+                'hydrationMl',
+                'nutritionKcal',
+              ] as const;
+              return keys
+                .map((k) => {
+                  const r = rows.find((row) => row[k] != null);
+                  return `${k}: ${r ? `${r[k]} (${r.day})` : 'none'}`;
+                })
+                .join('\n');
             })}
           />
         </Row>

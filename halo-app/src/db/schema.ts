@@ -181,6 +181,14 @@ export const hcDaily = sqliteTable('hc_daily', {
   systolic: real('systolic'),
   diastolic: real('diastolic'),
   glucoseMgDl: real('glucose_mg_dl'),
+  respRate: real('resp_rate'), // breaths per minute
+  bodyTempC: real('body_temp_c'),
+  bodyFatPct: real('body_fat_pct'),
+  vo2max: real('vo2max'), // ml/kg/min
+  weightKg: real('weight_kg'),
+  // Day totals logged in other apps; Advisor context only (never added to Halo's own logs).
+  hydrationMl: real('hydration_ml'),
+  nutritionKcal: real('nutrition_kcal'),
   fetchedAt: integer('fetched_at').notNull(),
 });
 

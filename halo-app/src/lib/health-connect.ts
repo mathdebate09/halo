@@ -41,6 +41,12 @@ const READ_TYPES = [
   'OxygenSaturation',
   'BloodPressure',
   'BloodGlucose',
+  'RespiratoryRate',
+  'BodyTemperature',
+  'BodyFat',
+  'Vo2Max',
+  'Hydration',
+  'Nutrition',
 ] as const;
 
 export type HealthConnectStatus = 'connected' | 'denied' | 'unavailable';
@@ -140,8 +146,9 @@ let lastRefresh = 0;
 
 /**
  * Pulls the last two weeks from Health Connect into the local `hc_daily` cache, which Today's live
- * scores read: steps, distance, active calories and exercise per 4 am day, last night's sleep, and
- * the latest resting HR, HRV, SpO2, blood pressure and glucose per day. Fire-and-forget and
+ * scores read: steps, distance, active calories, exercise, hydration and nutrition kcal per 4 am
+ * day, last night's sleep, and the day's latest resting HR, HRV, SpO2, blood pressure, glucose,
+ * respiratory rate, body temperature, body fat, VO2 max and weight. Fire-and-forget and
  * throttled; silent when Health Connect is missing, and each type only when it is granted.
  */
 export async function refreshHealthData(force = false): Promise<void> {
@@ -175,7 +182,13 @@ export async function refreshHealthData(force = false): Promise<void> {
 
     // Per-day totals on 4 am boundaries (24 h slices from the first day's rollover).
     const daily = async <
-      T extends 'Steps' | 'Distance' | 'ActiveCaloriesBurned' | 'ExerciseSession',
+      T extends
+        | 'Steps'
+        | 'Distance'
+        | 'ActiveCaloriesBurned'
+        | 'ExerciseSession'
+        | 'Hydration'
+        | 'Nutrition',
     >(
       recordType: T,
       apply: (
@@ -213,6 +226,15 @@ export async function refreshHealthData(force = false): Promise<void> {
         .EXERCISE_DURATION_TOTAL.inSeconds;
       r.exerciseMin = Math.round(seconds / 60);
     });
+    await daily('Hydration', (r, res) => {
+      const ml = (res as { VOLUME_TOTAL: { inMilliliters: number } }).VOLUME_TOTAL.inMilliliters;
+      r.hydrationMl = ml > 0 ? Math.round(ml) : null;
+    });
+    await daily('Nutrition', (r, res) => {
+      const kcal = (res as { ENERGY_TOTAL: { inKilocalories: number } }).ENERGY_TOTAL
+        .inKilocalories;
+      r.nutritionKcal = kcal > 0 ? Math.round(kcal) : null;
+    });
 
     // Instantaneous readings: the day's latest one wins (records come oldest first).
     const readings = async <
@@ -222,6 +244,11 @@ export async function refreshHealthData(force = false): Promise<void> {
         | 'OxygenSaturation'
         | 'BloodPressure'
         | 'BloodGlucose'
+        | 'RespiratoryRate'
+        | 'BodyTemperature'
+        | 'BodyFat'
+        | 'Vo2Max'
+        | 'Weight'
         | 'SleepSession',
     >(
       recordType: T,
@@ -256,6 +283,23 @@ export async function refreshHealthData(force = false): Promise<void> {
         level.inMilligramsPerDeciliter ??
         (level.unit === 'millimolesPerLiter' ? (level.value ?? 0) * 18 : level.value);
       if (mgDl) row(dayOf(r.time)).glucoseMgDl = Math.round(mgDl);
+    }
+    for (const r of await readings('RespiratoryRate')) {
+      if (rows.has(dayOf(r.time))) row(dayOf(r.time)).respRate = r.rate;
+    }
+    for (const r of await readings('BodyTemperature')) {
+      const c = r.temperature.inCelsius;
+      if (rows.has(dayOf(r.time)) && c) row(dayOf(r.time)).bodyTempC = Math.round(c * 10) / 10;
+    }
+    for (const r of await readings('BodyFat')) {
+      if (rows.has(dayOf(r.time))) row(dayOf(r.time)).bodyFatPct = r.percentage;
+    }
+    for (const r of await readings('Vo2Max')) {
+      if (rows.has(dayOf(r.time))) row(dayOf(r.time)).vo2max = r.vo2MillilitersPerMinuteKilogram;
+    }
+    for (const r of await readings('Weight')) {
+      const kg = r.weight.inKilograms;
+      if (rows.has(dayOf(r.time)) && kg) row(dayOf(r.time)).weightKg = Math.round(kg * 10) / 10;
     }
     // Sleep belongs to the day it ended on (last night → today), naps included. The night's span
     // runs from its first start to its last end (the wake time the assistant learns from).
@@ -301,6 +345,13 @@ export async function refreshHealthData(force = false): Promise<void> {
             'systolic',
             'diastolic',
             'glucose_mg_dl',
+            'resp_rate',
+            'body_temp_c',
+            'body_fat_pct',
+            'vo2max',
+            'weight_kg',
+            'hydration_ml',
+            'nutrition_kcal',
             'fetched_at',
           ].map((column) => [toCamel(column), sql.raw(`excluded.${column}`)]),
         ),
