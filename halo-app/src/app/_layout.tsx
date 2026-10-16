@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { ADVISOR_COLORS } from '@/advisor/theme';
 import { setupNotifications, useNotificationResponses } from '@/assistant/notify';
 import { LaunchSequence } from '@/components/launch-sequence';
 import { ToastHost } from '@/components/toast';
@@ -79,7 +80,14 @@ function RootNavigator() {
           />
           <Stack.Screen name="report/[id]" options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="reports" options={{ animation: 'slide_from_bottom' }} />
-          <Stack.Screen name="advisor" />
+          {/* The one light screen: its own background under the slide. */}
+          <Stack.Screen
+            name="advisor"
+            options={{
+              animation: 'slide_from_bottom',
+              contentStyle: { backgroundColor: ADVISOR_COLORS.bg },
+            }}
+          />
           <Stack.Screen name="share" options={{ animation: 'slide_from_bottom' }} />
         </Stack.Protected>
         <Stack.Protected guard={!onboarded}>

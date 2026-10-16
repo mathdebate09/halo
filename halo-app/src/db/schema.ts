@@ -3,6 +3,9 @@
 
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
+// Type-only (erased): drizzle-kit loads this file without the app's path aliases.
+import type { AdvisorCard } from '../shared/advisor';
+
 export type SyncState = 'pending' | 'synced' | 'failed';
 
 /** Columns every synced record carries. Times are epoch ms (client clock). */
@@ -173,6 +176,10 @@ export const advisorMessages = sqliteTable(
     role: text('role').$type<'user' | 'assistant'>().notNull(),
     content: text('content').notNull(),
     status: text('status').$type<'sending' | 'streaming' | 'done' | 'failed'>().notNull(),
+    /** The turn this message started (user) or answered (assistant); the poll resumes by it. */
+    turnId: text('turn_id'),
+    /** The reply's prepared step (at most one card), as the Advisor sent it. */
+    cards: text('cards', { mode: 'json' }).$type<AdvisorCard[]>(),
   },
   (t) => [index('advisor_thread').on(t.threadId, t.createdAt)],
 );

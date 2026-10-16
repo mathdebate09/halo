@@ -29,13 +29,14 @@ import {
   initialize,
   requestPermission,
 } from 'react-native-health-connect';
-import { createMMKV, useMMKVNumber, useMMKVString } from 'react-native-mmkv';
+import { createMMKV, useMMKVBoolean, useMMKVNumber, useMMKVString } from 'react-native-mmkv';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { router } from 'expo-router';
 import { and, count, desc, eq, isNull, sum } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 
+import { POLL_ONLY_KEY } from '@/advisor/client';
 import { TRACE_KEY } from '@/assistant/assistant';
 import { VITALS_TRACE_KEY } from '@/today/today-scores';
 import { revertActed } from '@/assistant/loop-store';
@@ -57,7 +58,7 @@ import { ThemedScreen } from '@/components/themed-screen';
 import { useHaloTheme } from '@/theme/theme-provider';
 import { db } from '@/db/client';
 import { deleteRecord, upsertRecord } from '@/db/mutate';
-import { hcDaily, outbox, water } from '@/db/schema';
+import { advisorMessages, hcDaily, outbox, water } from '@/db/schema';
 import { formatTime } from '@/lib/clock';
 import { connectHealthConnect, refreshHealthData } from '@/lib/health-connect';
 import { getDevice } from '@/lib/device';
@@ -362,6 +363,32 @@ function TodayRow() {
   );
 }
 
+/** The Advisor's fallback: skip SSE and poll the turn, as a phone without streaming would. */
+function AdvisorRow() {
+  const [pollOnly, setPollOnly] = useMMKVBoolean(POLL_ONLY_KEY, kv);
+  return (
+    <Row title="Advisor" status={pollOnly ? 'poll only (no SSE)' : 'SSE, poll as fallback'}>
+      <Btn
+        label={pollOnly ? 'Use SSE' : 'Poll only'}
+        onPress={() => setPollOnly(pollOnly ? undefined : true)}
+      />
+      <Btn label="Open" onPress={() => router.push('/advisor')} />
+      <Btn
+        label="Clear today's thread"
+        onPress={() => {
+          const day = dayKey(new Date());
+          const rows = db
+            .select({ id: advisorMessages.id })
+            .from(advisorMessages)
+            .where(and(eq(advisorMessages.threadId, day), isNull(advisorMessages.deletedAt)))
+            .all();
+          for (const r of rows) deleteRecord('advisorMessage', r.id);
+        }}
+      />
+    </Row>
+  );
+}
+
 /** Read-only: what the PA saw, set aside and ranked, and the brief it chose (latest Today pass). */
 function AssistantRow() {
   const [raw] = useMMKVString(TRACE_KEY, kv);
@@ -580,6 +607,7 @@ export default function DevScreen() {
         <TodayRow />
         <AssistantRow />
         <VitalsRow />
+        <AdvisorRow />
         <NotifyPlanRow />
         <ScreenTimeRow />
         <StoreRow />

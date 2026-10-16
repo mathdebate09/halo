@@ -27,22 +27,27 @@ export class ApiError extends Error {
   }
 }
 
+/** The headers every backend call carries: the app key and, once registered, the device. */
+export function apiHeaders(): Record<string, string> {
+  const device = getDevice();
+  return {
+    'content-type': 'application/json',
+    [APP_KEY_HEADER]: APP_KEY,
+    ...(device ? { [DEVICE_ID_HEADER]: device.id } : {}),
+  };
+}
+
 /** JSON request with device headers and a timeout. Throws ApiError (HTTP) or a network error. */
 export async function api<T>(
   path: string,
   init: { method?: string; body?: unknown; timeoutMs?: number } = {},
 ): Promise<T> {
-  const device = getDevice();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? TIMEOUT_MS);
   try {
     const res = await fetch(`${API_URL}${path}`, {
       method: init.method ?? 'GET',
-      headers: {
-        'content-type': 'application/json',
-        [APP_KEY_HEADER]: APP_KEY,
-        ...(device ? { [DEVICE_ID_HEADER]: device.id } : {}),
-      },
+      headers: apiHeaders(),
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
       signal: controller.signal,
     });

@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router/tabs';
 
+import { AdvisorSourcesPublisher } from '@/advisor/sources';
 import { AssistantProvider } from '@/assistant/assistant';
 import { Dock } from '@/components/dock';
 import { TodayScoresProvider } from '@/today/today-scores';
@@ -8,6 +9,8 @@ export default function TabsLayout() {
   return (
     <TodayScoresProvider>
       <AssistantProvider>
+        {/* Keeps the Advisor's snapshot sources current (it opens above the tabs). */}
+        <AdvisorSourcesPublisher />
         <Tabs
           tabBar={(props) => <Dock {...props} />}
           // Back from History returns to the logger, not to Today.

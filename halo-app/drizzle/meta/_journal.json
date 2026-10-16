@@ -43,6 +43,13 @@
       "when": 1792124009397,
       "tag": "0005_report_values",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792165037638,
+      "tag": "0006_advisor_cards",
+      "breakpoints": true
     }
   ]
 }

@@ -38,16 +38,20 @@ export function withAlpha(hex: string, alpha: number) {
 
 const kebab = (key: string) => key.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
 
+/** NativeWind CSS variables for a full set of color tokens. */
+export const colorVars = (colors: ThemeColors) =>
+  vars(
+    Object.fromEntries(
+      Object.entries(colors).map(([key, hex]) => [`--c-${kebab(key)}`, channels(hex)]),
+    ),
+  );
+
 // Built once per theme: NativeWind CSS variables for every color token.
 const varsCache = new Map<ThemeId, ReturnType<typeof vars>>();
 export function themeVars(theme: Theme) {
   let style = varsCache.get(theme.id);
   if (!style) {
-    style = vars(
-      Object.fromEntries(
-        Object.entries(theme.colors).map(([key, hex]) => [`--c-${kebab(key)}`, channels(hex)]),
-      ),
-    );
+    style = colorVars(theme.colors);
     varsCache.set(theme.id, style);
   }
   return style;
