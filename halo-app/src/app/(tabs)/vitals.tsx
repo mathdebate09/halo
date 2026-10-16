@@ -25,6 +25,7 @@ import { AreaCard } from '@/vitals/area-card';
 import { AREA_ICONS } from '@/vitals/areas';
 import { VitalsHero } from '@/vitals/hero';
 import { EmptyRow, MetricRow } from '@/vitals/metric-row';
+import { BloodWorkSection } from '@/reports/blood-work-section';
 import { ReportCard } from '@/reports/report-card';
 import { areaSummary } from '@/vitals/summary';
 
@@ -150,6 +151,7 @@ export default function VitalsScreen() {
               </View>
             );
           })}
+          <BloodWorkSection />
         </View>
       </ScrollView>
       <ReportCard />

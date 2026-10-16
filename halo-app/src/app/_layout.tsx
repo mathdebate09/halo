@@ -78,6 +78,7 @@ function RootNavigator() {
             }}
           />
           <Stack.Screen name="report/[id]" options={{ animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="reports" options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="advisor" />
           <Stack.Screen name="share" options={{ animation: 'slide_from_bottom' }} />
         </Stack.Protected>

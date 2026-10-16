@@ -1,3 +1,4 @@
+export * from './blood-work';
 export * from './brief-copy';
 export * from './day';
 export * from './exercise';
