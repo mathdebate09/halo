@@ -104,7 +104,8 @@
       [
         "expo-notifications",
         {
-          "color": "#101716"
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#a2bad8"
         }
       ],
       "expo-sharing",
