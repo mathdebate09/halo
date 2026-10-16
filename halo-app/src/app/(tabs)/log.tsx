@@ -38,6 +38,7 @@ import {
   ScaleIcon,
   WaterIcon,
 } from '@/components/icons';
+import { MicButton } from '@/components/mic-button';
 import { PressScale } from '@/components/press-scale';
 import { Sheet } from '@/components/sheet';
 import { setToastLift } from '@/components/toast';
@@ -45,6 +46,7 @@ import { ThemedScreen } from '@/components/themed-screen';
 import { db } from '@/db/client';
 import { mealItems, meals } from '@/db/schema';
 import { addWater, DEFAULT_GLASS_ML } from '@/lib/water';
+import { useDictation } from '@/lib/dictation';
 import { reanalyse } from '@/meals/analysis';
 import { saveMeal } from '@/meals/capture';
 import { MealCamera } from '@/meals/meal-camera';
@@ -339,6 +341,12 @@ function NoteBar({
 }) {
   const { theme } = useHaloTheme();
   const analysing = mode === 'analysing';
+  // Speaking the note (on the phone): the words land in the field, then Send as usual.
+  const dictation = useDictation(note, onChangeNote);
+  const send = () => {
+    dictation.cancel();
+    onSend();
+  };
   return (
     <Animated.View
       layout={LinearTransition.duration(450).easing(EASE_OUT)}
@@ -362,19 +370,37 @@ function NoteBar({
           <TextInput
             value={note}
             onChangeText={onChangeNote}
-            placeholder={mode === 'result' ? 'Something off? Tell me what to fix' : 'Add a note'}
+            placeholder={
+              dictation.listening
+                ? 'Listening…'
+                : (dictation.hint ??
+                  (mode === 'result' ? 'Something off? Tell me what to fix' : 'Add a note'))
+            }
             placeholderTextColor={theme.colors.muted}
             multiline
             maxLength={280}
             className="max-h-24 flex-1 py-2.5 font-sans text-[16px] text-text"
             accessibilityLabel={mode === 'result' ? 'Correction for the analysis' : 'Meal note'}
           />
+          {dictation.available ? (
+            <View className="mr-1.5">
+              <MicButton
+                listening={dictation.listening}
+                level={dictation.level}
+                onPress={dictation.toggle}
+                color={theme.colors.text}
+                fill={theme.colors.bg}
+                size={44}
+                offset={0}
+              />
+            </View>
+          ) : null}
           <PressScale
             accessibilityRole="button"
             accessibilityLabel={mode === 'result' ? 'Re-analyse' : 'Analyse meal'}
             accessibilityState={{ disabled: !canSend }}
             disabled={!canSend}
-            onPress={onSend}
+            onPress={send}
             className={`h-11 w-11 items-center justify-center rounded-full bg-text ${canSend ? '' : 'opacity-30'}`}>
             <ArrowUpIcon size={22} color={theme.colors.bg} />
           </PressScale>

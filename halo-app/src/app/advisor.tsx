@@ -19,8 +19,10 @@ import { useAdvisorSources } from '@/advisor/sources';
 import { ADVISOR_COLORS, advisorVars } from '@/advisor/theme';
 import { type AdvisorMessage, type Failure, useAdvisorThread } from '@/advisor/thread';
 import { ArrowUpIcon, ChevronDownIcon, PlusIcon, ReportIcon } from '@/components/icons';
+import { MicButton } from '@/components/mic-button';
 import { PressScale } from '@/components/press-scale';
 import { setToastsMuted } from '@/components/toast';
+import { useDictation } from '@/lib/dictation';
 import {
   ADVISOR_ENTRIES,
   ADVISOR_LIMITS,
@@ -56,6 +58,8 @@ export default function AdvisorScreen() {
   const sources = useAdvisorSources();
   const units = { pounds: sources?.pounds ?? false, clock24: sources?.clock24 ?? true };
   const [draft, setDraft] = useState('');
+  // Speaking into the composer (on the phone); the words land in the field to read and send.
+  const dictation = useDictation(draft, setDraft);
   const scroll = useRef<ScrollView>(null);
 
   // A note typed in the logger before opening the Advisor comes along (the user wrote it). The
@@ -91,6 +95,7 @@ export default function AdvisorScreen() {
   const canSend = draft.trim().length > 0 && !busy;
   const submit = () => {
     if (!canSend) return;
+    dictation.cancel();
     void send(draft, entry);
     setDraft('');
   };
@@ -119,7 +124,7 @@ export default function AdvisorScreen() {
         )
       : null;
   const starter =
-    live || draft || adding
+    live || draft || adding || dictation.listening
       ? null
       : (fromVitals ??
         (messages.length === 0 ? starterQuestion(sources?.briefSignal ?? null) : null));
@@ -281,13 +286,25 @@ export default function AdvisorScreen() {
           <TextInput
             value={draft}
             onChangeText={setDraft}
-            placeholder="Ask about today"
+            placeholder={dictation.listening ? 'Listening…' : (dictation.hint ?? 'Ask about today')}
             placeholderTextColor={ADVISOR_COLORS.muted}
             accessibilityLabel="Message"
             multiline
             maxLength={ADVISOR_LIMITS.message}
             className="ml-1 max-h-32 flex-1 py-3.5 font-sans text-[17px] text-text"
           />
+          {dictation.available ? (
+            <MicButton
+              listening={dictation.listening}
+              level={dictation.level}
+              onPress={() => {
+                setAdding(false);
+                dictation.toggle();
+              }}
+              color={ADVISOR_COLORS.text}
+              fill={ADVISOR_COLORS.bg}
+            />
+          ) : null}
           <PressScale
             accessibilityRole="button"
             accessibilityLabel="Send"

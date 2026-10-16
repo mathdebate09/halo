@@ -82,7 +82,7 @@
         {
           "cameraPermission": "Halo uses the camera to photograph meals so it can estimate what's on your plate.",
           "microphonePermission": false,
-          "recordAudioAndroid": false
+          "recordAudioAndroid": true
         }
       ],
       [
@@ -90,7 +90,7 @@
         {
           "photosPermission": "Halo uses your photos to log meals and as backgrounds for shared cards.",
           "cameraPermission": "Halo uses the camera to photograph meals so it can estimate what's on your plate.",
-          "microphonePermission": false
+          "microphonePermission": "Halo uses the microphone so you can speak a meal note or a question. What you say is recognised on your phone."
         }
       ],
       [
