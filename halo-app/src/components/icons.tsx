@@ -69,6 +69,16 @@ export function PlusIcon(props: IconProps) {
   );
 }
 
+/** A page with a folded corner and two lines: a medical report. */
+export function ReportIcon(props: IconProps) {
+  return (
+    <Line {...props}>
+      <Path d="M7 3h7l5 5v13H7z" />
+      <Path d="M14 3v5h5M10 13h6M10 17h6" />
+    </Line>
+  );
+}
+
 export function ChevronLeftIcon(props: IconProps) {
   return (
     <Line {...props}>

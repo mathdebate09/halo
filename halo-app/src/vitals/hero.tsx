@@ -2,8 +2,9 @@ import { router } from 'expo-router';
 import { Text, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, FadeIn } from 'react-native-reanimated';
 
-import { SparkleIcon, VitalsIcon } from '@/components/icons';
+import { PlusIcon, SparkleIcon, VitalsIcon } from '@/components/icons';
 import { PressScale } from '@/components/press-scale';
+import { addReport } from '@/reports/add';
 import { vitalsHeadline } from '@/shared';
 import { useHaloTheme } from '@/theme/theme-provider';
 import { useTodayScores } from '@/today/today-scores';
@@ -43,6 +44,15 @@ export function VitalsHero({
         <Text accessibilityRole="header" className="ml-2.5 font-serif text-[30px] text-text">
           Vitals
         </Text>
+        <View className="flex-1" />
+        <PressScale
+          accessibilityRole="button"
+          accessibilityLabel="Add a medical report"
+          onPress={() => void addReport()}
+          hitSlop={8}
+          className="h-11 w-11 items-center justify-center rounded-full bg-glass/10">
+          <PlusIcon size={22} color={theme.colors.text} />
+        </PressScale>
       </View>
 
       <View className="-mt-4">

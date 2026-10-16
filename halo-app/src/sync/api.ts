@@ -20,6 +20,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** The server's own message, when it sent one ("Daily limit reached"). */
+    readonly detail?: string,
   ) {
     super(message);
   }
@@ -44,7 +46,11 @@ export async function api<T>(
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
       signal: controller.signal,
     });
-    if (!res.ok) throw new ApiError(res.status, `${init.method ?? 'GET'} ${path} → ${res.status}`);
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { message?: unknown } | null;
+      const detail = typeof body?.message === 'string' ? body.message : undefined;
+      throw new ApiError(res.status, `${init.method ?? 'GET'} ${path} → ${res.status}`, detail);
+    }
     return (await res.json()) as T;
   } finally {
     clearTimeout(timer);

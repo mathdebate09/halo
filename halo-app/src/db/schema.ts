@@ -96,6 +96,16 @@ export const vitalsReadings = sqliteTable(
     reportId: text('report_id'),
     /** Report values only count once the user confirms them. */
     confirmed: integer('confirmed', { mode: 'boolean' }).notNull().default(true),
+    /** A report's name for an analyte Halo doesn't recognise (`metric` is then `lab:<slug>`). */
+    label: text('label'),
+    /** "<" / ">" for results printed past what the test reads ("<0.5"). */
+    qualifier: text('qualifier').$type<'<' | '>'>(),
+    /** The report's own range, in `unit`. */
+    refLo: real('ref_lo'),
+    refHi: real('ref_hi'),
+    refText: text('ref_text'),
+    /** The value and unit exactly as printed. */
+    raw: text('raw'),
   },
   (t) => [index('vitals_metric_at').on(t.metric, t.at)],
 );
@@ -109,7 +119,13 @@ export const reports = sqliteTable('reports', {
   reportDate: text('report_date'),
   pages: integer('pages'),
   extracted: text('extracted', { mode: 'json' }), // values awaiting the confirm step
+  /** Pages read so far while analysing; `capped` when image pages past the limit were left out. */
+  progress: text('progress', { mode: 'json' }).$type<ReportProgress>(),
+  /** Why reading failed (see `REPORT_ERRORS` in reports/runner). */
+  error: text('error'),
 });
+
+export type ReportProgress = { done: number; total: number; capped?: boolean };
 
 export type InsightState = 'pending' | 'shown' | 'acted' | 'ignored' | 'resolved';
 

@@ -66,6 +66,12 @@ export function usePlan(): Plan | null {
   return revive(raw);
 }
 
+/** The saved profile, outside React (background work). */
+export function readProfile(): Profile | null {
+  const raw = kv.getString(PROFILE_KEY);
+  return raw ? (JSON.parse(raw) as Profile) : null;
+}
+
 export function useProfile(): Profile | null {
   const [raw] = useMMKVString(PROFILE_KEY, kv);
   return raw ? (JSON.parse(raw) as Profile) : null;

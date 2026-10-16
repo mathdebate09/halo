@@ -62,6 +62,14 @@ function RootNavigator() {
             }}
           />
           <Stack.Screen
+            name="report-password"
+            options={{
+              presentation: 'transparentModal',
+              animation: 'fade',
+              contentStyle: { backgroundColor: 'transparent' },
+            }}
+          />
+          <Stack.Screen
             name="meal/[id]"
             options={{
               presentation: 'transparentModal',

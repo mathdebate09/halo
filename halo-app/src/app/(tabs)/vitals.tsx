@@ -25,6 +25,7 @@ import { AreaCard } from '@/vitals/area-card';
 import { AREA_ICONS } from '@/vitals/areas';
 import { VitalsHero } from '@/vitals/hero';
 import { EmptyRow, MetricRow } from '@/vitals/metric-row';
+import { ReportCard } from '@/reports/report-card';
 import { areaSummary } from '@/vitals/summary';
 
 // Vitals (SPEC §3), never called My Health: the hero (areas on their bands, one headline, one
@@ -151,6 +152,7 @@ export default function VitalsScreen() {
           })}
         </View>
       </ScrollView>
+      <ReportCard />
     </ThemedScreen>
   );
 }

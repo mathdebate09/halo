@@ -218,7 +218,7 @@ function ReportReadRow() {
     } catch (e) {
       setStatus(errorText(e));
     } finally {
-      if (pick === 'pdf') discard([res.assets[0]!.uri]);
+      discard(res.assets.map((a) => a.uri));
     }
   };
 

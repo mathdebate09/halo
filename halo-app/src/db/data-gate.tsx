@@ -4,6 +4,7 @@ import { Text, View } from 'react-native';
 
 import { ensureDevice } from '@/lib/device';
 import { startMealAnalysis } from '@/meals/analysis';
+import { startReportReading } from '@/reports/runner';
 import { startSyncWorker } from '@/sync/worker';
 
 import migrations from '../../drizzle/migrations';
@@ -21,9 +22,11 @@ export function DataGate({ children }: { children: ReactNode }) {
     ensureDevice();
     const stopSync = startSyncWorker();
     const stopAnalysis = startMealAnalysis();
+    const stopReports = startReportReading();
     return () => {
       stopSync();
       stopAnalysis();
+      stopReports();
     };
   }, [success]);
 
