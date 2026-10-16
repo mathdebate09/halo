@@ -147,8 +147,11 @@ export default function TodayScreen() {
             style={{ top: insets.top + 8 }}>
             {/* As wide as the buttons on the right, so the wordmark stays centred. */}
             <View className="h-11 w-[96px]" />
-            {/* Long-press the wordmark for the hidden developer screen. */}
-            <Pressable onLongPress={() => router.push('/dev')} delayLongPress={600} hitSlop={12}>
+            {/* Long-press the wordmark for the hidden developer screen (dev builds only). */}
+            <Pressable
+              onLongPress={__DEV__ ? () => router.push('/dev') : undefined}
+              delayLongPress={600}
+              hitSlop={12}>
               <Text className="font-wordmark text-[28px] text-text">Halo</Text>
             </Pressable>
             <View className="w-[96px] flex-row justify-end gap-2">

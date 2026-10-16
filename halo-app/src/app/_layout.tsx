@@ -94,7 +94,10 @@ function RootNavigator() {
         <Stack.Protected guard={!onboarded}>
           <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
         </Stack.Protected>
-        <Stack.Screen name="dev" />
+        {/* The developer screen exists in dev builds only. */}
+        <Stack.Protected guard={__DEV__}>
+          <Stack.Screen name="dev" />
+        </Stack.Protected>
       </Stack>
     </ThemeProvider>
   );
