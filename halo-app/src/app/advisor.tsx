@@ -1,7 +1,7 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
-import { useCallback, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -10,12 +10,24 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Reply, Thinking } from '@/advisor/reply';
+import { actOnCard } from '@/advisor/act';
+import { AdvisorCardView } from '@/advisor/card';
+import { Reply, Thinking, WORD_MS } from '@/advisor/reply';
+import { useAdvisorSources } from '@/advisor/sources';
 import { ADVISOR_COLORS, advisorVars } from '@/advisor/theme';
 import { type AdvisorMessage, type Failure, useAdvisorThread } from '@/advisor/thread';
 import { ArrowUpIcon, ChevronDownIcon } from '@/components/icons';
 import { PressScale } from '@/components/press-scale';
-import { ADVISOR_ENTRIES, ADVISOR_LIMITS, type AdvisorEntry, dayKey } from '@/shared';
+import { setToastLift } from '@/components/toast';
+import {
+  ADVISOR_ENTRIES,
+  ADVISOR_LIMITS,
+  type AdvisorCard,
+  type AdvisorEntry,
+  dayKey,
+  entryQuestion,
+  starterQuestion,
+} from '@/shared';
 
 // The Advisor (SPEC §3): today's conversation about the user's own data, on the one light screen.
 // Answers arrive a few words at a time; every message is kept on the phone (and synced).
@@ -32,7 +44,7 @@ const FAILURE_WORDS: Record<Failure['code'], string> = {
 
 export default function AdvisorScreen() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ from?: string }>();
+  const params = useLocalSearchParams<{ from?: string; note?: string }>();
   const entry = (ADVISOR_ENTRIES as readonly string[]).includes(params.from ?? '')
     ? (params.from as AdvisorEntry)
     : null;
@@ -40,14 +52,38 @@ export default function AdvisorScreen() {
   // Messages from before the screen opened show as they are; new ones fade in.
   const [openedAt] = useState(() => Date.now());
   const { messages, live, failure, send, retry, busy } = useAdvisorThread(day);
+  const sources = useAdvisorSources();
+  const units = { pounds: sources?.pounds ?? false, clock24: sources?.clock24 ?? true };
   const [draft, setDraft] = useState('');
   const scroll = useRef<ScrollView>(null);
 
-  // Dark status bar on this light screen only.
+  // Where it was opened from fills the composer once: the Vitals pill brings the question about
+  // what the hero leads with, Plus brings a note typed in the logger. The user sends it.
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current || !sources) return;
+    prefilled.current = true;
+    const note = params.note?.trim();
+    const question =
+      note ||
+      entryQuestion(
+        entry,
+        sources.scores.vitalsReport.areas,
+        sources.lab.factors,
+        sources.profile?.goal,
+      );
+    if (question) setDraft(question.slice(0, ADVISOR_LIMITS.message));
+  }, [entry, params.note, sources]);
+
+  // Dark status bar on this light screen only, and toasts (Undo, View) clear the composer.
   useFocusEffect(
     useCallback(() => {
       setStatusBarStyle('dark', true);
-      return () => setStatusBarStyle('light', true);
+      setToastLift('advisor', 110);
+      return () => {
+        setStatusBarStyle('light', true);
+        setToastLift('advisor', 0);
+      };
     }, []),
   );
 
@@ -60,18 +96,37 @@ export default function AdvisorScreen() {
   const canSend = draft.trim().length > 0 && !busy;
   const submit = () => {
     if (!canSend) return;
-    send(draft, entry);
+    void send(draft, entry);
     setDraft('');
   };
+  // One question to start with, from today's brief, while the thread is empty.
+  const starter =
+    messages.length === 0 && !live && !draft ? starterQuestion(sources?.briefSignal ?? null) : null;
 
   const lastUser = [...messages].reverse().find((m) => m.role === 'user');
   type Item =
     | { kind: 'user'; message: AdvisorMessage }
-    | { kind: 'reply'; turnId: string; text: string; live: boolean; status: string | null };
+    | {
+        kind: 'reply';
+        turnId: string;
+        text: string;
+        live: boolean;
+        status: string | null;
+        card: (AdvisorCard & { done?: boolean }) | null;
+        message: AdvisorMessage | null;
+      };
   const items: Item[] = messages.map((m) =>
     m.role === 'user'
       ? { kind: 'user', message: m }
-      : { kind: 'reply', turnId: m.turnId ?? m.id, text: m.content, live: false, status: null },
+      : {
+          kind: 'reply',
+          turnId: m.turnId ?? m.id,
+          text: m.content,
+          live: false,
+          status: null,
+          card: m.cards?.[0] ?? null,
+          message: m,
+        },
   );
   if (live && !messages.some((m) => m.role === 'assistant' && m.turnId === live.turnId)) {
     items.push({
@@ -80,6 +135,8 @@ export default function AdvisorScreen() {
       text: live.sentences.join(' '),
       live: true,
       status: live.status,
+      card: live.card,
+      message: null,
     });
   }
 
@@ -127,12 +184,37 @@ export default function AdvisorScreen() {
               ) : (
                 <Thinking label={item.status} />
               )}
+              {item.card && item.text ? (
+                <AdvisorCardView
+                  card={item.card}
+                  units={units}
+                  // While streaming, the card waits for the reply's words to land.
+                  enterDelay={item.live ? item.text.split(/\s+/).length * WORD_MS + 260 : null}
+                  onAct={() => {
+                    // Done typing: the toast with its Undo / View shows above the composer.
+                    Keyboard.dismiss();
+                    if (item.card && item.message)
+                      void actOnCard(item.card, item.message, units.clock24);
+                  }}
+                />
+              ) : null}
             </View>
           ),
         )}
       </ScrollView>
 
       <View className="px-4 pb-2 pt-2">
+        {starter ? (
+          <Animated.View entering={FadeIn.duration(260).easing(EASE_OUT)} className="mb-3 flex-row">
+            <PressScale
+              accessibilityRole="button"
+              accessibilityHint="Sends this question"
+              onPress={() => void send(starter, entry)}
+              className="rounded-pill border border-hairline/15 px-4 py-2.5">
+              <Text className="font-sans text-[15px] text-text">{starter}</Text>
+            </PressScale>
+          </Animated.View>
+        ) : null}
         <View className="flex-row items-end rounded-[26px] border border-hairline/10 bg-surface pl-5 pr-1.5">
           <TextInput
             value={draft}

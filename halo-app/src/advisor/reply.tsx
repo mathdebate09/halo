@@ -13,7 +13,7 @@ import Animated, {
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
 /** Words arrive at about the pace a reply is read; Learn more's reveal uses 90 ms. */
-const WORD_MS = 60;
+export const WORD_MS = 60;
 const FADE_MS = 260;
 
 const TEXT = 'font-sans text-[17px] leading-[26px] text-text';

@@ -7,9 +7,11 @@ import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { randomUUID } from 'expo-crypto';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { usageAccess } from '@/assistant/screen';
 import { db } from '@/db/client';
 import { upsertRecord } from '@/db/mutate';
 import { advisorMessages } from '@/db/schema';
+import { healthConnectState } from '@/lib/health-connect';
 import {
   type AdvisorCard,
   type AdvisorEntry,
@@ -82,7 +84,7 @@ export function useAdvisorThread(day: string) {
   );
 
   const send = useCallback(
-    (text: string, entry: AdvisorEntry | null, retryOf?: AdvisorMessage) => {
+    async (text: string, entry: AdvisorEntry | null, retryOf?: AdvisorMessage) => {
       const message = text.trim();
       if (!message || busy.current) return;
       const turnId = randomUUID();
@@ -111,13 +113,21 @@ export function useAdvisorThread(day: string) {
         return;
       }
 
+      busy.current = true;
       const sources = readAdvisorSources();
-      const context = sources ? buildAdvisorContext(sources) : null;
+      const connected = {
+        healthConnect: (await healthConnectState()) === 'connected',
+        screenTime: usageAccess() === 'granted',
+      };
+      const context = sources ? buildAdvisorContext(sources, connected) : null;
       if (!context) {
+        busy.current = false;
         upsertRecord('advisorMessage', { ...saved, id, status: 'failed' });
         setFailure({ messageId: id, code: 'no_plan' });
         return;
       }
+      // What a tapped card did (water, a meal, a weigh-in) is in the snapshot itself; history is
+      // the words only (a note in a reply here gets copied into the next one).
       const history = trimHistory(
         earlier.map((m) => ({ role: m.role, content: m.content.slice(0, 2000) })),
       );
@@ -149,7 +159,7 @@ export function useAdvisorThread(day: string) {
 
   /** Sends a failed message again as a new turn. */
   const retry = useCallback(
-    (message: AdvisorMessage) => send(message.content, null, message),
+    (message: AdvisorMessage) => void send(message.content, null, message),
     [send],
   );
 

@@ -178,8 +178,8 @@ export const advisorMessages = sqliteTable(
     status: text('status').$type<'sending' | 'streaming' | 'done' | 'failed'>().notNull(),
     /** The turn this message started (user) or answered (assistant); the poll resumes by it. */
     turnId: text('turn_id'),
-    /** The reply's prepared step (at most one card), as the Advisor sent it. */
-    cards: text('cards', { mode: 'json' }).$type<AdvisorCard[]>(),
+    /** The reply's prepared step (at most one card), as the Advisor sent it; `done` once acted on. */
+    cards: text('cards', { mode: 'json' }).$type<(AdvisorCard & { done?: boolean })[]>(),
   },
   (t) => [index('advisor_thread').on(t.threadId, t.createdAt)],
 );

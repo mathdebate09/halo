@@ -262,7 +262,17 @@ export default function MealLogger() {
             onLongPress={() => setWaterSheet(true)}
           />
           <Action label="Weigh-in" Icon={ScaleIcon} onPress={() => router.push('/weigh-in')} />
-          <Action label="Advisor" Icon={ChatIcon} onPress={() => router.push('/advisor')} />
+          <Action
+            label="Advisor"
+            Icon={ChatIcon}
+            // A note already typed here goes along as the question.
+            onPress={() =>
+              router.push({
+                pathname: '/advisor',
+                params: { from: 'plus', ...(note.trim() ? { note: note.trim() } : {}) },
+              })
+            }
+          />
           <Action label="Workout" Icon={RunIcon} onPress={() => router.navigate('/exercise')} />
         </View>
       </View>

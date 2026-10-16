@@ -131,7 +131,11 @@ function todaysMeals(day: string, clock: (at: number) => string) {
 }
 
 /** The snapshot, or null when there is nothing to build it from yet (no plan). */
-export function buildAdvisorContext(src: AdvisorSources, now = new Date()): AdvisorContext | null {
+export function buildAdvisorContext(
+  src: AdvisorSources,
+  connected: AdvisorContext['connected'],
+  now = new Date(),
+): AdvisorContext | null {
   const { scores, plan, profile } = src;
   if (!plan || !profile?.goal) return null;
   const { facts, vitalsReport, vitalsInput, day } = scores;
@@ -276,6 +280,7 @@ export function buildAdvisorContext(src: AdvisorSources, now = new Date()): Advi
         distanceKm: s.distanceM == null ? null : Math.round(s.distanceM / 100) / 10,
         kcal: null,
       })),
+    connected,
   };
   const parsed = advisorContextSchema.safeParse(context);
   if (!parsed.success) {

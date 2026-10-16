@@ -94,6 +94,7 @@ const context = (over: Partial<AdvisorContext['today']> = {}): AdvisorContext =>
   days: [],
   meals: [],
   sessions: [],
+  connected: { healthConnect: true, screenTime: true },
 });
 
 const body = (over: Record<string, unknown> = {}) => ({
@@ -257,6 +258,20 @@ describe('a streamed turn', () => {
     rounds = [answer('LDL is 142 mg/dL, above range, expected under 100. Tap to log the paneer lunch.')];
     const { events } = await stream(device, body({ message: 'LDL?' }));
     expect(events.at(-1)).toMatchObject({ type: 'done', text: 'LDL is 142 mg/dL, above range, expected under 100.', cards: [] });
+  });
+
+  it('never offers to connect what is already connected', async () => {
+    const device = await registered();
+    rounds = [toolRound('', ['open', { target: 'usage_access' }]), answer('Late screen time is 4 h 52 min.')];
+    const { events } = await stream(device, body({ message: 'Evenings?' }));
+    expect(events.some((e) => e.type === 'card')).toBe(false);
+    expect(requests[1]!.messages.at(-1)!.content).toContain('already allowed');
+  });
+
+  it('writes plan numbers with thousands separators', async () => {
+    const device = await registered();
+    await stream(device, body());
+    expect(requests[0]!.messages[0]!.content).toContain('8,000 steps');
   });
 
   it('forces an answer on the last round', async () => {

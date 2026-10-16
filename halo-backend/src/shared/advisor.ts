@@ -14,7 +14,7 @@ import { z } from 'zod';
 import type { Factor, FactorKey } from './blood-work.js';
 import { MEAL_TYPES } from './meals.js';
 import { BANNED } from './phrase.js';
-import { leadFactor } from './signals.js';
+import { type InsightFacts, type InsightKind, leadFactor } from './signals.js';
 import type { Area, AreaKey } from './vitals.js';
 import { vitalsHeadline } from './vitals.js';
 
@@ -180,6 +180,8 @@ export const advisorContextSchema = z.object({
   days: z.array(dayRowSchema).max(14),
   meals: z.array(mealRowSchema).max(12),
   sessions: z.array(sessionSchema).max(30),
+  /** Sources already set up: the Advisor never offers to connect them again. */
+  connected: z.object({ healthConnect: z.boolean(), screenTime: z.boolean() }),
 });
 export type AdvisorContext = z.infer<typeof advisorContextSchema>;
 
@@ -510,6 +512,36 @@ export function trimHistory(
   }
   while (kept[0]?.role === 'assistant') kept.shift();
   return kept;
+}
+
+// ── The one starter the screen offers, from today's brief ──────────────────────
+
+const STARTERS: Partial<Record<InsightKind, string>> = {
+  protein_pace: 'How do I close the protein gap today?',
+  calorie_pace: 'Am I eating enough today?',
+  calorie_over: 'What helps after a big day of eating?',
+  water_pace: 'How much water is left today?',
+  weigh_in: 'How is my weight trend going?',
+  sleep_debt: 'How do I catch up on sleep?',
+  bedtime: 'How do I sleep better tonight?',
+  sleep_pattern: 'How do I sleep better tonight?',
+  weekly_review: 'How did this week go?',
+  quiet_days: 'Where do I pick up from?',
+  blood_work: 'What does my blood work say?',
+};
+const MEAL_STARTER: Record<string, string> = {
+  breakfast: 'What makes a good breakfast for me?',
+  lunch: 'What makes a good lunch for me?',
+  dinner: 'What makes a good dinner for me?',
+  snack: 'What makes a good snack for me?',
+};
+const DEFAULT_STARTER = 'What matters most today?';
+
+/** One question to start with, about what today's brief is about. */
+export function starterQuestion(brief: { type: InsightKind; facts: InsightFacts } | null): string {
+  if (!brief) return DEFAULT_STARTER;
+  if (brief.type === 'meal_window') return MEAL_STARTER[String(brief.facts.meal)] ?? DEFAULT_STARTER;
+  return STARTERS[brief.type] ?? DEFAULT_STARTER;
 }
 
 // ── The question an entry point brings ──────────────────────────────────────────

@@ -15,6 +15,7 @@ import {
   replyGuard,
   splitSentences,
   sseData,
+  starterQuestion,
   sseFrame,
   tidySentence,
   trimHistory,
@@ -63,6 +64,7 @@ const context: AdvisorContext = {
   days: [],
   meals: [],
   sessions: [],
+  connected: { healthConnect: true, screenTime: true },
 };
 
 const body = (over: Record<string, unknown> = {}) => ({
@@ -383,5 +385,17 @@ describe('entryQuestion', () => {
     expect(entryQuestion('vitals', [area('sleep', 90), area('heart', 92)], [], 'maintain')).toBe('What keeps my vitals steady?');
     expect(entryQuestion('plus', [area('sleep', 40)], [], 'maintain')).toBeNull();
     expect(entryQuestion(null, [area('sleep', 40)], [], 'maintain')).toBeNull();
+  });
+});
+
+describe('starterQuestion', () => {
+  it('asks about what the brief is about, in the user voice, never with goals', () => {
+    expect(starterQuestion({ type: 'protein_pace', facts: {} })).toBe('How do I close the protein gap today?');
+    expect(starterQuestion({ type: 'meal_window', facts: { meal: 'dinner' } })).toBe('What makes a good dinner for me?');
+    expect(starterQuestion({ type: 'on_track', facts: {} })).toBe('What matters most today?');
+    expect(starterQuestion(null)).toBe('What matters most today?');
+    for (const type of ['protein_pace', 'calorie_over', 'blood_work', 'weekly_review'] as const) {
+      expect(starterQuestion({ type, facts: {} })).not.toMatch(/\bgoals?\b|\bAI\b/i);
+    }
   });
 });

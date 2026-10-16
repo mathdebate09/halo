@@ -15,6 +15,8 @@ import {
   dayKey,
   type ExerciseSessionInfo,
   type InsightCopy,
+  type InsightFacts,
+  type InsightKind,
   type LabResult,
   type Factor,
   type Plan,
@@ -24,6 +26,8 @@ import { type TodayScores, useTodayScores } from '@/today/today-scores';
 export type AdvisorSources = {
   scores: TodayScores;
   brief: InsightCopy | null;
+  /** What the brief is about, for the one starter question. */
+  briefSignal: { type: InsightKind; facts: InsightFacts } | null;
   lab: { results: LabResult[]; factors: Factor[]; addedDay: string | null };
   profile: Profile | null;
   plan: Plan | null;
@@ -67,6 +71,7 @@ export function AdvisorSourcesPublisher() {
     current = {
       scores,
       brief: words,
+      briefSignal: words ? { type: brief.insight.type, facts: brief.insight.facts } : null,
       lab: { results, factors, addedDay },
       profile,
       plan,

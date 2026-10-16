@@ -214,7 +214,7 @@ export class AdvisorTools {
 
     switch (call.name) {
       case 'get_today':
-        return { result: { ...ctx.today, plan: ctx.plan } };
+        return { result: { ...ctx.today, plan: ctx.plan, connected: ctx.connected } };
       case 'get_vitals':
         return { result: { vitalsScore: ctx.today.scores.vitals, areas: ctx.vitals.areas, readings: ctx.vitals.rows } };
       case 'get_blood_work': {
@@ -330,6 +330,11 @@ export class AdvisorTools {
       }
       default: {
         const p = args.open.safeParse(raw);
+        // Never offer to set up what's already there.
+        if (p.success && p.data.target === 'connect' && ctx.connected.healthConnect)
+          return { result: { error: 'Health Connect is already connected.' } };
+        if (p.success && p.data.target === 'usage_access' && ctx.connected.screenTime)
+          return { result: { error: 'Screen time is already allowed.' } };
         candidate = p.success ? { kind: 'open', target: p.data.target } : null;
         summary = p.success ? `A shortcut to ${p.data.target}.` : '';
       }
