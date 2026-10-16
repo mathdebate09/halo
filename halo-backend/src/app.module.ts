@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule } from '@nestjs/throttler';
 
+import { AdvisorModule } from './advisor/advisor.module.js';
 import { AiModule } from './ai/ai.module.js';
 import { ENV, type Env } from './config.js';
 import { DeviceThrottlerGuard } from './device/device-throttler.guard.js';
@@ -34,6 +35,7 @@ export class AppModule {
         MealsModule,
         ReportsModule,
         InsightsModule,
+        AdvisorModule,
       ],
       controllers: [HealthController, LegalController],
       providers: [

@@ -8,5 +8,6 @@ import { MealsService } from './meals.service.js';
   imports: [JobsModule],
   controllers: [MealsController],
   providers: [MealsService],
+  exports: [MealsService],
 })
 export class MealsModule {}

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 
 import { z } from 'zod';
 
-import { appKeySchema, REPORT_LIMITS } from './shared/index.js';
+import { ADVISOR_LIMITS, appKeySchema, REPORT_LIMITS } from './shared/index.js';
 
 // Local dev reads halo-backend/.env (never committed); Heroku sets config vars directly.
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -27,6 +27,9 @@ const envSchema = z.object({
   /** Report pages a device may have running at once, and send per 24 h. */
   REPORT_PAGES_IN_FLIGHT: z.coerce.number().int().positive().default(REPORT_LIMITS.pagesInFlight),
   REPORT_PAGES_PER_DAY: z.coerce.number().int().positive().default(REPORT_LIMITS.pagesPerDay),
+  /** An Advisor turn's whole budget (tool rounds and the answer), and the SSE heartbeat. */
+  ADVISOR_TURN_MS: z.coerce.number().int().positive().default(ADVISOR_LIMITS.turnMs),
+  ADVISOR_PING_MS: z.coerce.number().int().positive().default(15_000),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -227,7 +227,7 @@ export const advisorCardSchema = z.discriminatedUnion('kind', [
         z.object({
           name: z.string().min(1).max(60),
           portion: text(40),
-          grams: amount(2000),
+          grams: maybe(2000),
           kcal: amount(3000),
           proteinG: amount(300),
           carbsG: amount(500),
