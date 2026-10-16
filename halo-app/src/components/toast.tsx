@@ -13,7 +13,18 @@ let nextId = 1;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
+/** Screens that are a conversation (the Advisor) say everything in place: no toasts while open. */
+let muted = false;
+export function setToastsMuted(on: boolean) {
+  muted = on;
+  if (on && current) {
+    current = null;
+    emit();
+  }
+}
+
 export function showToast(message: string, action?: Toast['action']) {
+  if (muted) return;
   current = { id: nextId++, message, action };
   emit();
 }

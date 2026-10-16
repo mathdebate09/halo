@@ -1,5 +1,7 @@
 // A card under a reply does its step in one tap, through the same local writes as the rest of the
-// app; corrections come after (Undo, or View to fix). Nothing waits on the network.
+// app; the correction stays on the card (Undo, or View to fix), never in a toast: the Advisor is a
+// chat. What an Undo needs (the record, the weigh-in it replaced, the reminder) is kept on the
+// card, so it still works after a restart. Nothing waits on the network.
 
 import { and, eq, isNull } from 'drizzle-orm';
 import * as Haptics from 'expo-haptics';
@@ -7,16 +9,15 @@ import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 
 import { runAction } from '@/assistant/actions';
-import { showToast } from '@/components/toast';
 import { db } from '@/db/client';
 import { deleteRecord, upsertRecord } from '@/db/mutate';
-import { weights } from '@/db/schema';
+import { type StoredAdvisorCard as StoredCard, weights } from '@/db/schema';
 import { emitMealLogged } from '@/meals/events';
 import { type AdvisorCard, dayKey, displayWeight, formatClock, round } from '@/shared';
 
 import type { AdvisorMessage } from './thread';
 
-export type StoredCard = AdvisorCard & { done?: boolean };
+export type { StoredAdvisorCard as StoredCard } from '@/db/schema';
 
 const OPEN_TITLES: Record<Extract<AdvisorCard, { kind: 'open' }>['target'], string> = {
   log: 'Log a meal',
@@ -70,13 +71,13 @@ export function cardWords(
   }
 }
 
-function markDone(message: AdvisorMessage, done: boolean) {
-  const cards = (message.cards ?? []).map((c, i) => (i === 0 ? { ...c, done } : c));
-  upsertRecord('advisorMessage', { ...message, cards });
+/** Rewrites the message's card (there's at most one). */
+function setCard(message: AdvisorMessage, card: StoredCard) {
+  upsertRecord('advisorMessage', { ...message, cards: [card] });
 }
 
 /** Today's weigh-in, kept to one a day like the weigh-in sheet. */
-function saveWeight(kg: number) {
+function saveWeight(kg: number): { id: string; prev: StoredCard['prev'] } {
   const now = new Date();
   const day = dayKey(now);
   const existing = db
@@ -91,12 +92,16 @@ function saveWeight(kg: number) {
     kg: round(kg, 1),
     source: 'manual',
   });
-  return () => {
-    if (existing) {
-      const { id: oldId, day: d, at, kg: oldKg, source } = existing;
-      upsertRecord('weight', { id: oldId, day: d, at, kg: oldKg, source });
-    } else deleteRecord('weight', id);
-  };
+  const prev = existing
+    ? {
+        id: existing.id,
+        day: existing.day,
+        at: existing.at,
+        kg: existing.kg,
+        source: existing.source,
+      }
+    : null;
+  return { id, prev };
 }
 
 /** A logged meal with its items, eaten now. */
@@ -149,66 +154,37 @@ function reminderAt(at: string | null, now = new Date()): Date {
   return d;
 }
 
-/** Does the card's step, marks it done on its message, and offers the correction. */
-export async function actOnCard(card: StoredCard, message: AdvisorMessage, clock24: boolean) {
+/** Does the card's step and marks it done on its message, keeping what an Undo needs. */
+export async function actOnCard(card: StoredCard, message: AdvisorMessage) {
   if (card.done) return;
+  const done = (fields: Partial<StoredCard>) => {
+    setCard(message, { ...card, ...fields, done: true } as StoredCard);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
   switch (card.kind) {
     case 'water': {
       const now = new Date();
-      const id = upsertRecord('water', { day: dayKey(now), at: now.getTime(), ml: card.ml });
-      markDone(message, true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      showToast(`${card.ml} ml water`, {
-        label: 'Undo',
-        onPress: () => {
-          deleteRecord('water', id);
-          markDone(message, false);
-        },
-      });
+      done({ ref: upsertRecord('water', { day: dayKey(now), at: now.getTime(), ml: card.ml }) });
       return;
     }
     case 'weight': {
-      const undo = saveWeight(card.kg);
-      markDone(message, true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      showToast('Weight saved', {
-        label: 'Undo',
-        onPress: () => {
-          undo();
-          markDone(message, false);
-        },
-      });
+      const { id, prev } = saveWeight(card.kg);
+      done({ ref: id, prev });
       return;
     }
-    case 'meal': {
-      const id = logMeal(card);
-      markDone(message, true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      showToast('Logged', {
-        label: 'View',
-        onPress: () => router.push({ pathname: '/meal/[id]', params: { id } }),
-      });
+    case 'meal':
+      done({ ref: logMeal(card) });
       return;
-    }
     case 'exercise': {
-      const when = reminderAt(card.at);
-      const nid = await Notifications.scheduleNotificationAsync({
+      const ref = await Notifications.scheduleNotificationAsync({
         content: { title: card.title, body: `${card.minutes} min · ${card.moves.join(', ')}` },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: when,
+          date: reminderAt(card.at),
           channelId: 'pace',
         },
       });
-      markDone(message, true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      showToast(`Reminder at ${formatClock(when.getHours() + when.getMinutes() / 60, clock24)}`, {
-        label: 'Undo',
-        onPress: () => {
-          Notifications.cancelScheduledNotificationAsync(nid);
-          markDone(message, false);
-        },
-      });
+      done({ ref });
       return;
     }
     case 'open':
@@ -217,4 +193,32 @@ export async function actOnCard(card: StoredCard, message: AdvisorMessage, clock
       else runAction({ kind: card.target });
       return;
   }
+}
+
+/** The correction a done card offers in place: Undo, or View for a logged meal (fixed there). */
+export function cardCorrection(card: StoredCard): 'Undo' | 'View' | null {
+  if (!card.done || !card.ref) return null;
+  return card.kind === 'meal' ? 'View' : card.kind === 'open' ? null : 'Undo';
+}
+
+export function correctCard(card: StoredCard, message: AdvisorMessage) {
+  if (!card.done || !card.ref) return;
+  switch (card.kind) {
+    case 'meal':
+      router.push({ pathname: '/meal/[id]', params: { id: card.ref } });
+      return;
+    case 'water':
+      deleteRecord('water', card.ref);
+      break;
+    case 'weight':
+      if (card.prev) upsertRecord('weight', card.prev);
+      else deleteRecord('weight', card.ref);
+      break;
+    case 'exercise':
+      Notifications.cancelScheduledNotificationAsync(card.ref);
+      break;
+    case 'open':
+      return;
+  }
+  setCard(message, { ...card, done: false, ref: null, prev: undefined } as StoredCard);
 }

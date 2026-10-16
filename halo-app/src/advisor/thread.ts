@@ -88,7 +88,10 @@ export function useAdvisorThread(day: string) {
       const message = text.trim();
       if (!message || busy.current) return;
       const turnId = randomUUID();
-      const earlier = messages.filter((m) => m.status === 'done' && m.id !== retryOf?.id);
+      // A photo or a report on its own isn't a question: only words go into the history.
+      const earlier = messages.filter(
+        (m) => m.status === 'done' && m.id !== retryOf?.id && m.content.trim().length > 0,
+      );
 
       // A red flag answers on the phone too, so it works offline and without waiting.
       const flag = redFlag(message);

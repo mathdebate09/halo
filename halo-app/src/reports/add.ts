@@ -11,33 +11,55 @@ import { REPORT_LIMITS } from '@/shared';
 import { canUnlockPdf, discard, pageCount, type ReportSource, sourceHash } from './pages';
 import { existingReport, startReport } from './runner';
 
-/** A locked PDF waiting for its password (one at a time). */
-let pending: { source: Extract<ReportSource, { kind: 'pdf' }>; hash: string } | null = null;
+/** A locked PDF waiting for its password (one at a time), and who to tell once it starts. */
+let pending: {
+  source: Extract<ReportSource, { kind: 'pdf' }>;
+  hash: string;
+  onStarted?: (id: string) => void;
+} | null = null;
+
+/** How adding went: started (its id), waiting for a password, cancelled, or a problem to say. */
+export type AddOutcome =
+  | { kind: 'started'; id: string }
+  | { kind: 'locked' }
+  | { kind: 'cancelled' }
+  | { kind: 'problem'; message: string };
+
+type AddOptions = {
+  /** Say problems in the caller's own place (the Advisor's chat) instead of a toast. */
+  quiet?: boolean;
+  /** A locked PDF starts after its password: the caller hears the id then. */
+  onStarted?: (id: string) => void;
+};
 
 const errorCode = (e: unknown) => (e as { code?: string } | null)?.code;
 
 function begin(source: ReportSource, hash: string, total: number) {
-  startReport(source, hash, Math.min(total, REPORT_LIMITS.maxPages));
+  return startReport(source, hash, Math.min(total, REPORT_LIMITS.maxPages));
 }
 
-export async function addReport() {
+export async function addReport({ quiet, onStarted }: AddOptions = {}): Promise<AddOutcome> {
+  const problem = (message: string): AddOutcome => {
+    if (!quiet) showToast(message);
+    return { kind: 'problem', message };
+  };
   const res = await DocumentPicker.getDocumentAsync({
     type: ['application/pdf', 'image/*'],
     multiple: true,
     copyToCacheDirectory: true,
   });
-  if (res.canceled) return;
+  if (res.canceled) return { kind: 'cancelled' };
   const uris = res.assets.map((a) => a.uri);
   const isPdf = (a: DocumentPicker.DocumentPickerAsset) =>
     a.mimeType === 'application/pdf' || a.name.toLowerCase().endsWith('.pdf');
   const pdfs = res.assets.filter(isPdf);
   if (pdfs.length > 1 || (pdfs.length === 1 && res.assets.length > 1)) {
     discard(uris);
-    return showToast('Pick one PDF, or photos of the pages');
+    return problem('Pick one PDF, or photos of the pages.');
   }
   if (res.assets.some((a) => (a.size ?? 0) > REPORT_LIMITS.maxFileBytes)) {
     discard(uris);
-    return showToast('This file is too large');
+    return problem('This file is too large.');
   }
   const source: ReportSource =
     pdfs.length === 1 ? { kind: 'pdf', uri: uris[0]! } : { kind: 'images', uris };
@@ -45,22 +67,23 @@ export async function addReport() {
     const hash = await sourceHash(source);
     if (existingReport(hash)) {
       discard(uris);
-      return showToast('This report is already added');
+      return problem('This report is already added.');
     }
     try {
-      begin(source, hash, await pageCount(source));
+      return { kind: 'started', id: begin(source, hash, await pageCount(source)) };
     } catch (e) {
       if (errorCode(e) !== 'ERR_PDF_LOCKED' || source.kind !== 'pdf') throw e;
       if (!canUnlockPdf) {
         discard(uris);
-        return showToast('This PDF is locked. Remove the password and try again.');
+        return problem('This PDF is locked. Remove the password and try again.');
       }
-      pending = { source, hash };
+      pending = { source, hash, onStarted };
       router.push('/report-password');
+      return { kind: 'locked' };
     }
   } catch {
     discard(uris);
-    showToast("This file couldn't be opened");
+    return problem("This file couldn't be opened.");
   }
 }
 
@@ -70,7 +93,8 @@ export async function unlockPending(password: string): Promise<'ok' | 'wrong' | 
   const source = { ...pending.source, password };
   try {
     const total = await pageCount(source);
-    begin(source, pending.hash, total);
+    const id = begin(source, pending.hash, total);
+    pending.onStarted?.(id);
     pending = null;
     return 'ok';
   } catch (e) {

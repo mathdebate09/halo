@@ -8,6 +8,7 @@ import m0003 from './0003_insight_loop.sql';
 import m0004 from './0004_hc_more.sql';
 import m0005 from './0005_report_values.sql';
 import m0006 from './0006_advisor_cards.sql';
+import m0007 from './0007_advisor_attachments.sql';
 
   export default {
     journal,
@@ -18,7 +19,8 @@ m0002,
 m0003,
 m0004,
 m0005,
-m0006
+m0006,
+m0007
     }
   }
   

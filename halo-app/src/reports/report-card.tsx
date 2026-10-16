@@ -29,7 +29,7 @@ import { CARD_STATUSES, dismissReport, type ReportError, RETRYABLE, retryReport 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const CARD_HEIGHT = 62;
 
-const ERROR_LINES: Record<ReportError, string> = {
+export const ERROR_LINES: Record<ReportError, string> = {
   no_results: 'No test results on it',
   daily_limit: 'That’s enough pages for today. Try again tomorrow.',
   unavailable: 'Try again in a while',

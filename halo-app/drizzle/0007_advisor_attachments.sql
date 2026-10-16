@@ -1,0 +1,1 @@
+ALTER TABLE `advisor_messages` ADD `attachment` text;

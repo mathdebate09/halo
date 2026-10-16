@@ -8,21 +8,22 @@ import Animated, {
   useAnimatedKeyboard,
   useAnimatedStyle,
 } from 'react-native-reanimated';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { actOnCard } from '@/advisor/act';
-import { AdvisorCardView } from '@/advisor/card';
+import { actOnCard, correctCard, type StoredCard } from '@/advisor/act';
+import { attachMealPhoto, attachReport, type PhotoSource } from '@/advisor/attach';
+import { AdvisorCardView, MealPhotoCard, ReportChatCard } from '@/advisor/card';
 import { Reply, Thinking, WORD_MS } from '@/advisor/reply';
 import { useAdvisorSources } from '@/advisor/sources';
 import { ADVISOR_COLORS, advisorVars } from '@/advisor/theme';
 import { type AdvisorMessage, type Failure, useAdvisorThread } from '@/advisor/thread';
-import { ArrowUpIcon, ChevronDownIcon } from '@/components/icons';
+import { ArrowUpIcon, ChevronDownIcon, PlusIcon, ReportIcon } from '@/components/icons';
 import { PressScale } from '@/components/press-scale';
-import { setToastLift } from '@/components/toast';
+import { setToastsMuted } from '@/components/toast';
 import {
   ADVISOR_ENTRIES,
   ADVISOR_LIMITS,
-  type AdvisorCard,
   type AdvisorEntry,
   dayKey,
   entryQuestion,
@@ -57,35 +58,29 @@ export default function AdvisorScreen() {
   const [draft, setDraft] = useState('');
   const scroll = useRef<ScrollView>(null);
 
-  // Where it was opened from fills the composer once: the Vitals pill brings the question about
-  // what the hero leads with, Plus brings a note typed in the logger. The user sends it.
-  const prefilled = useRef(false);
+  // A note typed in the logger before opening the Advisor comes along (the user wrote it). The
+  // app never writes into the composer itself: its question is a suggestion above it.
+  const carried = useRef(false);
   useEffect(() => {
-    if (prefilled.current || !sources) return;
-    prefilled.current = true;
+    if (carried.current) return;
+    carried.current = true;
     const note = params.note?.trim();
-    const question =
-      note ||
-      entryQuestion(
-        entry,
-        sources.scores.vitalsReport.areas,
-        sources.lab.factors,
-        sources.profile?.goal,
-      );
-    if (question) setDraft(question.slice(0, ADVISOR_LIMITS.message));
-  }, [entry, params.note, sources]);
+    if (note) setDraft(note.slice(0, ADVISOR_LIMITS.message));
+  }, [params.note]);
 
-  // Dark status bar on this light screen only, and toasts (Undo, View) clear the composer.
+  // Dark status bar on this light screen only.
   useFocusEffect(
     useCallback(() => {
       setStatusBarStyle('dark', true);
-      setToastLift('advisor', 110);
-      return () => {
-        setStatusBarStyle('light', true);
-        setToastLift('advisor', 0);
-      };
+      return () => setStatusBarStyle('light', true);
     }, []),
   );
+  // No toasts while the Advisor is open, sheets over it included: it's a conversation, so every
+  // result and correction is said in the chat.
+  useEffect(() => {
+    setToastsMuted(true);
+    return () => setToastsMuted(false);
+  }, []);
 
   // The composer rides on the keyboard.
   const keyboard = useAnimatedKeyboard();
@@ -99,9 +94,35 @@ export default function AdvisorScreen() {
     void send(draft, entry);
     setDraft('');
   };
-  // One question to start with, from today's brief, while the thread is empty.
+  // The +: a meal photo (camera or library) or a lab report, straight into the chat.
+  const [adding, setAdding] = useState(false);
+  const addPhoto = async (from: PhotoSource) => {
+    setAdding(false);
+    Keyboard.dismiss();
+    if ((await attachMealPhoto(day, from, draft)) && draft) setDraft('');
+  };
+  const addLabReport = () => {
+    setAdding(false);
+    Keyboard.dismiss();
+    void attachReport(day);
+  };
+  // One suggested question, one tap to send: from Vitals, about what the hero leads with (until
+  // something is sent here); otherwise, on an empty thread, about today's brief.
+  const sentHere = messages.some((m) => m.role === 'user' && m.createdAt > openedAt);
+  const fromVitals =
+    entry === 'vitals' && sources && !sentHere
+      ? entryQuestion(
+          entry,
+          sources.scores.vitalsReport.areas,
+          sources.lab.factors,
+          sources.profile?.goal,
+        )
+      : null;
   const starter =
-    messages.length === 0 && !live && !draft ? starterQuestion(sources?.briefSignal ?? null) : null;
+    live || draft || adding
+      ? null
+      : (fromVitals ??
+        (messages.length === 0 ? starterQuestion(sources?.briefSignal ?? null) : null));
 
   const lastUser = [...messages].reverse().find((m) => m.role === 'user');
   type Item =
@@ -112,7 +133,7 @@ export default function AdvisorScreen() {
         text: string;
         live: boolean;
         status: string | null;
-        card: (AdvisorCard & { done?: boolean }) | null;
+        card: StoredCard | null;
         message: AdvisorMessage | null;
       };
   const items: Item[] = messages.map((m) =>
@@ -191,10 +212,11 @@ export default function AdvisorScreen() {
                   // While streaming, the card waits for the reply's words to land.
                   enterDelay={item.live ? item.text.split(/\s+/).length * WORD_MS + 260 : null}
                   onAct={() => {
-                    // Done typing: the toast with its Undo / View shows above the composer.
                     Keyboard.dismiss();
-                    if (item.card && item.message)
-                      void actOnCard(item.card, item.message, units.clock24);
+                    if (item.card && item.message) void actOnCard(item.card, item.message);
+                  }}
+                  onCorrect={() => {
+                    if (item.card && item.message) correctCard(item.card, item.message);
                   }}
                 />
               ) : null}
@@ -204,6 +226,27 @@ export default function AdvisorScreen() {
       </ScrollView>
 
       <View className="px-4 pb-2 pt-2">
+        {adding ? (
+          <Animated.View
+            entering={FadeIn.duration(200).easing(EASE_OUT)}
+            className="mb-3 flex-row gap-2">
+            {(
+              [
+                ['Camera', () => void addPhoto('camera')],
+                ['Photos', () => void addPhoto('library')],
+                ['Lab report', addLabReport],
+              ] as const
+            ).map(([label, onPress]) => (
+              <PressScale
+                key={label}
+                accessibilityRole="button"
+                onPress={onPress}
+                className="rounded-pill border border-hairline/15 px-4 py-2.5">
+                <Text className="font-sans text-[15px] text-text">{label}</Text>
+              </PressScale>
+            ))}
+          </Animated.View>
+        ) : null}
         {starter ? (
           <Animated.View entering={FadeIn.duration(260).easing(EASE_OUT)} className="mb-3 flex-row">
             <PressScale
@@ -215,7 +258,26 @@ export default function AdvisorScreen() {
             </PressScale>
           </Animated.View>
         ) : null}
-        <View className="flex-row items-end rounded-[26px] border border-hairline/10 bg-surface pl-5 pr-1.5">
+        <View className="flex-row items-end rounded-[26px] border border-hairline/10 bg-surface pl-1.5 pr-1.5">
+          <PressScale
+            accessibilityRole="button"
+            accessibilityLabel={adding ? 'Close' : 'Add a photo or a lab report'}
+            onPress={() => setAdding((a) => !a)}
+            hitSlop={6}
+            pressableStyle={styles.sendSpot}>
+            <Animated.View
+              style={[
+                styles.add,
+                {
+                  transform: [{ rotate: adding ? '45deg' : '0deg' }],
+                  transitionProperty: 'transform',
+                  transitionDuration: 200,
+                  transitionTimingFunction: 'ease-out',
+                },
+              ]}>
+              <PlusIcon size={22} color={ADVISOR_COLORS.text} />
+            </Animated.View>
+          </PressScale>
           <TextInput
             value={draft}
             onChangeText={setDraft}
@@ -224,7 +286,7 @@ export default function AdvisorScreen() {
             accessibilityLabel="Message"
             multiline
             maxLength={ADVISOR_LIMITS.message}
-            className="max-h-32 flex-1 py-3.5 font-sans text-[17px] text-text"
+            className="ml-1 max-h-32 flex-1 py-3.5 font-sans text-[17px] text-text"
           />
           <PressScale
             accessibilityRole="button"
@@ -270,15 +332,49 @@ function UserMessage({
   showRetry: boolean;
   onRetry: () => void;
 }) {
+  const attachment = message.attachment;
   return (
     <View className="mb-6 items-end">
-      <Animated.View
-        entering={fresh ? FadeIn.duration(260).easing(EASE_OUT) : undefined}
-        className="max-w-[85%] rounded-[22px] bg-glass/[0.07] px-4 py-3">
-        <Text className="font-sans text-[16px] leading-[23px] text-text" selectable>
-          {message.content}
-        </Text>
-      </Animated.View>
+      {attachment?.kind === 'meal' && attachment.photoUri ? (
+        <Animated.View
+          entering={fresh ? FadeIn.duration(260).easing(EASE_OUT) : undefined}
+          className="mb-2">
+          <Image
+            source={{ uri: attachment.photoUri }}
+            style={styles.photo}
+            contentFit="cover"
+            accessibilityLabel="Meal photo"
+          />
+        </Animated.View>
+      ) : null}
+      {attachment?.kind === 'report' ? (
+        <Animated.View
+          entering={fresh ? FadeIn.duration(260).easing(EASE_OUT) : undefined}
+          className="mb-2 flex-row items-center rounded-[22px] bg-glass/[0.07] px-4 py-3">
+          <ReportIcon size={18} color={ADVISOR_COLORS.text} />
+          <Text className="ml-2 font-sans text-[16px] text-text">Lab report</Text>
+        </Animated.View>
+      ) : null}
+      {message.content ? (
+        <Animated.View
+          entering={fresh ? FadeIn.duration(260).easing(EASE_OUT) : undefined}
+          className="max-w-[85%] rounded-[22px] bg-glass/[0.07] px-4 py-3">
+          <Text className="font-sans text-[16px] leading-[23px] text-text" selectable>
+            {message.content}
+          </Text>
+        </Animated.View>
+      ) : null}
+      {/* What the attachment became, said like a reply. */}
+      {attachment?.kind === 'meal' ? (
+        <View className="self-stretch">
+          <MealPhotoCard mealId={attachment.mealId} />
+        </View>
+      ) : null}
+      {attachment?.kind === 'report' ? (
+        <View className="self-stretch">
+          <ReportChatCard reportId={attachment.reportId} />
+        </View>
+      ) : null}
       {showRetry ? (
         <Animated.View
           entering={FadeIn.duration(200).easing(EASE_OUT)}
@@ -299,6 +395,8 @@ function UserMessage({
 
 const styles = StyleSheet.create({
   sendSpot: { marginBottom: 6 },
+  add: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  photo: { width: 200, height: 200, borderRadius: 20 },
   send: {
     width: 40,
     height: 40,

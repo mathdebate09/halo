@@ -6,6 +6,25 @@ import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core
 // Type-only (erased): drizzle-kit loads this file without the app's path aliases.
 import type { AdvisorCard } from '../shared/advisor';
 
+/** A reply's card as kept on the phone: done once acted on, with what its Undo needs. */
+export type StoredAdvisorCard = AdvisorCard & {
+  done?: boolean;
+  ref?: string | null;
+  prev?: {
+    id: string;
+    day: string;
+    at: number;
+    kg: number;
+    source: 'manual' | 'health-connect' | 'onboarding';
+  } | null;
+};
+
+/** What a user message carries besides its words: a meal photo or a lab report (by id). */
+export type AdvisorAttachment =
+  | { kind: 'meal'; mealId: string; photoUri: string | null }
+  | { kind: 'report'; reportId: string }
+  | { kind: 'note'; text: string };
+
 export type SyncState = 'pending' | 'synced' | 'failed';
 
 /** Columns every synced record carries. Times are epoch ms (client clock). */
@@ -179,7 +198,8 @@ export const advisorMessages = sqliteTable(
     /** The turn this message started (user) or answered (assistant); the poll resumes by it. */
     turnId: text('turn_id'),
     /** The reply's prepared step (at most one card), as the Advisor sent it; `done` once acted on. */
-    cards: text('cards', { mode: 'json' }).$type<(AdvisorCard & { done?: boolean })[]>(),
+    cards: text('cards', { mode: 'json' }).$type<StoredAdvisorCard[]>(),
+    attachment: text('attachment', { mode: 'json' }).$type<AdvisorAttachment>(),
   },
   (t) => [index('advisor_thread').on(t.threadId, t.createdAt)],
 );
