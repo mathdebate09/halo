@@ -9,7 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PrimaryButton } from '@/components/button';
 import { kv } from '@/lib/kv';
 import { goNext, useStepFocus } from '@/onboarding/navigation';
-import { useHaloTheme } from '@/theme/theme-provider';
+import { useStatusBarStyle } from '@/theme/status-bar';
+import { ImageScope, useHaloTheme } from '@/theme/theme-provider';
 import { themes, withAlpha } from '@/theme/themes';
 
 // scr 2: the welcome slide. A calm hero photo with the copy settled at the bottom (Oura's language).
@@ -31,11 +32,13 @@ async function askPermissions() {
 
 export default function IntroStep() {
   useStepFocus('intro');
+  useStatusBarStyle('light');
   const insets = useSafeAreaInsets();
-  const { theme } = useHaloTheme();
+  // Over the photo: the theme's dark tokens in either mode.
+  const theme = themes[useHaloTheme().theme.id];
 
   return (
-    <View className="flex-1">
+    <ImageScope style={{ flex: 1 }}>
       <Image
         source={{ uri: HERO.image }}
         placeholder={{ blurhash: HERO.blurhash }}
@@ -77,6 +80,6 @@ export default function IntroStep() {
           />
         </Animated.View>
       </View>
-    </View>
+    </ImageScope>
   );
 }

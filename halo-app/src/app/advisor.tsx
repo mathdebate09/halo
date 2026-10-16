@@ -1,6 +1,5 @@
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { setStatusBarStyle } from 'expo-status-bar';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, {
   Easing,
@@ -31,6 +30,7 @@ import {
   entryQuestion,
   starterQuestion,
 } from '@/shared';
+import { useStatusBarStyle } from '@/theme/status-bar';
 
 // The Advisor (SPEC §3): today's conversation about the user's own data, on the one light screen.
 // Answers arrive a few words at a time; every message is kept on the phone (and synced).
@@ -72,13 +72,8 @@ export default function AdvisorScreen() {
     if (note) setDraft(note.slice(0, ADVISOR_LIMITS.message));
   }, [params.note]);
 
-  // Dark status bar on this light screen only.
-  useFocusEffect(
-    useCallback(() => {
-      setStatusBarStyle('dark', true);
-      return () => setStatusBarStyle('light', true);
-    }, []),
-  );
+  // Dark status bar icons: the Advisor is light in either mode.
+  useStatusBarStyle('dark');
   // No toasts while the Advisor is open, sheets over it included: it's a conversation, so every
   // result and correction is said in the chat.
   useEffect(() => {

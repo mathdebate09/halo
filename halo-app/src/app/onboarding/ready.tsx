@@ -6,6 +6,8 @@ import { PrimaryButton } from '@/components/button';
 import { HeroBackdrop } from '@/components/hero-backdrop';
 import { replayReveal } from '@/components/reveal';
 import { goNext, useStepFocus } from '@/onboarding/navigation';
+import { useStatusBarStyle } from '@/theme/status-bar';
+import { ImageScope } from '@/theme/theme-provider';
 
 // scr 19: the journey begins on the hero Today will show (high tier, set at plan time). The image
 // drifts to exactly 1×, then the root crossfades to Today drawing the identical hero, so only the
@@ -14,9 +16,10 @@ const rise = (i: number) => FadeInDown.duration(600).delay(250 + i * 90);
 
 export default function ReadyStep() {
   useStepFocus('ready');
+  useStatusBarStyle('light');
   const insets = useSafeAreaInsets();
   return (
-    <View className="flex-1">
+    <ImageScope style={{ flex: 1 }}>
       <HeroBackdrop drift />
       <View className="flex-1 justify-end px-6" style={{ paddingBottom: insets.bottom + 16 }}>
         <Animated.View entering={rise(0)}>
@@ -36,6 +39,6 @@ export default function ReadyStep() {
           />
         </Animated.View>
       </View>
-    </View>
+    </ImageScope>
   );
 }

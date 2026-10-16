@@ -1,6 +1,6 @@
 import '../global.css';
 
-import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
@@ -19,16 +19,17 @@ import { HaloThemeProvider, useHaloTheme } from '@/theme/theme-provider';
 SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
-  const { theme } = useHaloTheme();
+  const { theme, mode } = useHaloTheme();
   const onboarded = useOnboarded();
   useNotificationResponses();
   useEffect(() => {
     // Channels, buttons and the background action task; failures only cost the push path.
     setupNotifications().catch(() => {});
   }, []);
+  const base = mode === 'light' ? DefaultTheme : DarkTheme;
   const navigationTheme = {
-    ...DarkTheme,
-    colors: { ...DarkTheme.colors, background: theme.colors.bg, card: theme.colors.bg },
+    ...base,
+    colors: { ...base.colors, background: theme.colors.bg, card: theme.colors.bg },
   };
   return (
     <ThemeProvider value={navigationTheme}>

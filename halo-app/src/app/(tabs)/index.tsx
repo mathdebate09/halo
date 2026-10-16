@@ -21,7 +21,14 @@ import { recordShown } from '@/assistant/loop-store';
 import { useBriefWords } from '@/assistant/phrasing';
 import { useDockInset } from '@/components/dock';
 import { HeroBackdrop } from '@/components/hero-backdrop';
-import { DietIcon, ExerciseIcon, ShareIcon, VitalsIcon } from '@/components/icons';
+import {
+  DietIcon,
+  ExerciseIcon,
+  MoonIcon,
+  ShareIcon,
+  SunIcon,
+  VitalsIcon,
+} from '@/components/icons';
 import { PressScale } from '@/components/press-scale';
 import { Reveal } from '@/components/reveal';
 import { ScoreArc, ScoreScrim } from '@/components/score-arc';
@@ -32,7 +39,9 @@ import { setShareSnapshot } from '@/share/snapshot';
 import { PendingMealCard } from '@/meals/pending-meal-card';
 import { hourOfDay } from '@/shared';
 import { motion } from '@/theme/motion';
-import { useHaloTheme } from '@/theme/theme-provider';
+import { useStatusBarStyle } from '@/theme/status-bar';
+import { ImageScope, useHaloTheme } from '@/theme/theme-provider';
+import { themes } from '@/theme/themes';
 import { briefCopy, todayCopy } from '@/today/copy';
 import { prefetchHeroes } from '@/today/prefetch';
 import { useMealCelebration } from '@/today/celebration';
@@ -56,7 +65,9 @@ export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const [size, setSize] = useState({ width: window.width, height: window.height });
-  const { theme, target } = useHaloTheme();
+  const { theme, target, mode, setMode } = useHaloTheme();
+  // The hero sits on the photo: its colors are the theme's dark ones in either mode.
+  const hero = themes[theme.id];
   const scores = useTodayScores();
   const focused = useIsFocused();
   const glow = useMealCelebration(scores, focused);
@@ -89,6 +100,15 @@ export default function TodayScreen() {
       if (reached && !before) scheduleOnRN(setArmed, true);
     },
   );
+  // Light status bar icons over the photo; once the Halo bar covers it, the mode's own.
+  const [heroAway, setHeroAway] = useState(false);
+  useAnimatedReaction(
+    () => scrollY.get() > height * 0.7,
+    (away, before) => {
+      if (away !== before) scheduleOnRN(setHeroAway, away);
+    },
+  );
+  useStatusBarStyle(heroAway ? null : 'light');
   const scrimStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrollY.get(), [height * 0.55, height * 0.8], [0, 1], Extrapolation.CLAMP),
   }));
@@ -119,28 +139,50 @@ export default function TodayScreen() {
         }}>
         {/* The hero: one screen tall, scrolling away (its image a little slower) for Learn more. */}
         {/* Clipped, so the parallaxed image never spills under the summary. */}
-        <View style={{ height, overflow: 'hidden' }}>
+        <ImageScope style={{ height, overflow: 'hidden' }}>
           <HeroBackdrop scrollY={scrollY} />
           <Reveal
             index={0}
             className="absolute inset-x-0 flex-row items-center justify-between px-5"
             style={{ top: insets.top + 8 }}>
-            <View className="h-11 w-11" />
+            {/* As wide as the buttons on the right, so the wordmark stays centred. */}
+            <View className="h-11 w-[96px]" />
             {/* Long-press the wordmark for the hidden developer screen. */}
             <Pressable onLongPress={() => router.push('/dev')} delayLongPress={600} hitSlop={12}>
               <Text className="font-wordmark text-[28px] text-text">Halo</Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Share"
-              onPress={() => {
-                setShareSnapshot(scores, tierCopy.tagline, theme);
-                router.push('/share');
-              }}
-              hitSlop={8}
-              className="h-11 w-11 items-center justify-center rounded-full active:bg-glass/10">
-              <ShareIcon size={24} color={theme.colors.text} />
-            </Pressable>
+            <View className="w-[96px] flex-row justify-end gap-2">
+              <PressScale
+                accessibilityRole="button"
+                accessibilityLabel={mode === 'light' ? 'Dark mode' : 'Light mode'}
+                onPress={() => setMode(mode === 'light' ? 'dark' : 'light')}
+                hitSlop={4}
+                className="h-11 w-11 items-center justify-center">
+                {/* The mode it switches to; the icons trade places with a short fade. */}
+                <Animated.View
+                  key={mode}
+                  entering={FadeIn.duration(200).easing(motion.calm)}
+                  exiting={FadeOut.duration(150)}
+                  className="absolute">
+                  {mode === 'light' ? (
+                    <MoonIcon size={22} color={hero.colors.text} />
+                  ) : (
+                    <SunIcon size={24} color={hero.colors.text} />
+                  )}
+                </Animated.View>
+              </PressScale>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Share"
+                onPress={() => {
+                  setShareSnapshot(scores, tierCopy.tagline, hero);
+                  router.push('/share');
+                }}
+                hitSlop={8}
+                className="h-11 w-11 items-center justify-center rounded-full active:bg-glass/10">
+                <ShareIcon size={24} color={hero.colors.text} />
+              </Pressable>
+            </View>
           </Reveal>
 
           <Reveal
@@ -151,19 +193,19 @@ export default function TodayScreen() {
               label="Diet"
               value={scores.diet.value}
               Icon={DietIcon}
-              color={theme.colors.text}
+              color={hero.colors.text}
             />
             <ScoreChip
               label="Activity"
               value={scores.activity.value}
               Icon={ExerciseIcon}
-              color={theme.colors.text}
+              color={hero.colors.text}
             />
             <ScoreChip
               label="Vitals"
               value={scores.vitals.value}
               Icon={VitalsIcon}
-              color={theme.colors.text}
+              color={hero.colors.text}
             />
           </Reveal>
 
@@ -253,7 +295,7 @@ export default function TodayScreen() {
               </PressScale>
             </Reveal>
           </View>
-        </View>
+        </ImageScope>
 
         <View
           className="px-4 pt-3"

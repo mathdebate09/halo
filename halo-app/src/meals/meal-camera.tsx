@@ -18,7 +18,7 @@ import Animated, {
 
 import { CloseIcon, GalleryIcon } from '@/components/icons';
 import { PressScale } from '@/components/press-scale';
-import { useHaloTheme } from '@/theme/theme-provider';
+import { ImageScope, useHaloTheme } from '@/theme/theme-provider';
 import { tierGradients } from '@/theme/themes';
 
 import { compressPhoto } from './capture';
@@ -38,7 +38,16 @@ type Props = {
  * and permission is granted. Tapping lifts the blur into a clear viewfinder with a shutter; the
  * shot then freezes in the card. Without the camera the theme gradient stays and opens the gallery.
  */
-export function MealCamera({ active, photo, onPhoto }: Props) {
+export function MealCamera(props: Props) {
+  // A camera feed or a photo: the theme's dark tokens in either mode.
+  return (
+    <ImageScope style={{ flex: 1 }}>
+      <CameraCard {...props} />
+    </ImageScope>
+  );
+}
+
+function CameraCard({ active, photo, onPhoto }: Props) {
   const { theme } = useHaloTheme();
   const [permission, requestPermission] = useCameraPermissions();
   const [lifted, setLifted] = useState(false);
