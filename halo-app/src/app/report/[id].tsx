@@ -100,10 +100,8 @@ const outside = (state: string | null | undefined) =>
 
 function Review({ id, merged, sex }: { id: string; merged: MergedReport; sex: Sex | null }) {
   const insets = useSafeAreaInsets();
-  const values = merged?.values ?? [];
-  const [kept, setKept] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(values.map((v) => [v.id, v.include])),
-  );
+  // Everything read goes in (no picking); where one test was read two ways, the surer reading.
+  const values = (merged?.values ?? []).filter((v) => v.include);
   /** Fixed numbers, in the printed unit. */
   const [edits, setEdits] = useState<Record<string, number>>({});
   /** A printed date (or NO_DATE) → the date the user chose instead. */
@@ -141,12 +139,11 @@ function Review({ id, merged, sex }: { id: string; merged: MergedReport; sex: Se
       list: [...list].sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)),
     }));
 
-  const keptValues = values.filter((v) => kept[v.id]);
-  const undated = keptValues.some((v) => !dateOf(v));
-  const n = keptValues.length;
+  const undated = values.some((v) => !dateOf(v));
+  const n = values.length;
 
   const add = () => {
-    const list: KeptValue[] = keptValues.map((v) => ({ ...fixed(v), date: dateOf(v)! }));
+    const list: KeptValue[] = values.map((v) => ({ ...fixed(v), date: dateOf(v)! }));
     const added = confirmReport(id, list);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.back();
@@ -180,7 +177,7 @@ function Review({ id, merged, sex }: { id: string; merged: MergedReport; sex: Se
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: insets.bottom + 180 }}>
-        <Header title="Check your report" line="Tap a number to fix it. Untick what’s wrong." />
+        <Header title="Check your report" line="Tap a number to fix it." />
         {groups.map(({ key, list }) => {
           const shown = dates[key] ?? (key === NO_DATE ? null : key);
           return (
@@ -204,9 +201,8 @@ function Review({ id, merged, sex }: { id: string; merged: MergedReport; sex: Se
               <View className="gap-2">
                 {list.map((v) => {
                   const view = views.get(v.id)!;
-                  const note = v.conflict
-                    ? 'Read two ways. Keep one.'
-                    : v.confidence < CHECK_CONFIDENCE && edits[v.id] == null
+                  const note =
+                    (v.conflict || v.confidence < CHECK_CONFIDENCE) && edits[v.id] == null
                       ? 'Check this one'
                       : null;
                   return (
@@ -220,8 +216,6 @@ function Review({ id, merged, sex }: { id: string; merged: MergedReport; sex: Se
                       words={view.words?.words ?? null}
                       state={view.words?.state ?? null}
                       note={note}
-                      include={kept[v.id]}
-                      onToggle={() => setKept((k) => ({ ...k, [v.id]: !k[v.id] }))}
                       onEdit={(value) => setEdits((e) => ({ ...e, [v.id]: value }))}
                     />
                   );
