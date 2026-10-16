@@ -38,7 +38,8 @@ const GOAL_WORDS = { lose: 'lose weight', maintain: 'keep weight steady', gain: 
 
 /** Data can't close its own block or open a tag. */
 const quote = (s: string) => s.replace(/[<>]/g, (c) => (c === '<' ? '‹' : '›'));
-const n = (v: number) => String(Math.round(v));
+/** Whole numbers as people read them: 9,000 steps, 2,100 kcal. */
+const n = (v: number) => Math.round(v).toLocaleString('en-GB');
 
 function summary(ctx: AdvisorContext, entry: AdvisorEntry | null): string {
   const { profile, plan, today, vitals, blood } = ctx;
