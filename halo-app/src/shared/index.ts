@@ -1,5 +1,6 @@
 // GENERATED from halo-shared/src/index.ts by halo-shared/scripts/sync.mjs. Do not edit.
 
+export * from './advisor';
 export * from './blood-work';
 export * from './brief-copy';
 export * from './day';

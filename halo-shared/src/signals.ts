@@ -458,11 +458,27 @@ const REPORT_BRIEF_DAYS = 3;
  * Which factors move with each plan goal: the PA speaks about these first. The goal stays one
  * goal (the user's plan); this only orders what a report says.
  */
-const GOAL_FIRST: Record<'lose' | 'maintain' | 'gain', readonly FactorKey[]> = {
+export const GOAL_FIRST: Record<'lose' | 'maintain' | 'gain', readonly FactorKey[]> = {
   lose: ['blood_sugar', 'cholesterol'],
   maintain: [],
   gain: ['haemoglobin', 'b12', 'vitamin_d'],
 };
+
+/**
+ * The factor outside its range that speaks first: far outside (a doctor), then what moves with
+ * the plan's goal, then the usual order. Null when every factor is in range.
+ */
+export function leadFactor(
+  factors: readonly Factor[],
+  goal: 'lose' | 'maintain' | 'gain' | null | undefined,
+): Factor | null {
+  const first = GOAL_FIRST[goal ?? 'maintain'];
+  const rank = (f: Factor) => (f.lead.far ? 0 : first.includes(f.key) ? 1 : 2);
+  const outside = factors
+    .filter((f) => f.lead.state && f.lead.state !== 'inside')
+    .sort((a, b) => rank(a) - rank(b));
+  return outside[0] ?? null;
+}
 
 /**
  * After a report is added: one thing from it, ready to act on. Far outside a range comes first
@@ -477,14 +493,8 @@ function bloodWorkBrief(ctx: PaContext): Signal | null {
     (r) => r.type === 'blood_work' && r.id.endsWith(tag) && (r.state === 'acted' || r.state === 'ignored'),
   );
   if (done) return null;
-  const known = bw.factors.filter((f) => f.lead.state);
-  if (known.length === 0) return null;
-  const first = GOAL_FIRST[ctx.facts.goal ?? 'maintain'];
-  const rank = (f: Factor) => (f.lead.far ? 0 : first.includes(f.key) ? 1 : 2);
-  const outside = known
-    .filter((f) => f.lead.state !== 'inside')
-    .sort((a, b) => rank(a) - rank(b));
-  const focus = outside[0];
+  if (!bw.factors.some((f) => f.lead.state)) return null;
+  const focus = leadFactor(bw.factors, ctx.facts.goal);
   return {
     id: `${ctx.day}:blood_work:${tag}`,
     type: 'blood_work',
