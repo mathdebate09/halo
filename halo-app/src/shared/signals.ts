@@ -4,6 +4,7 @@
 // Halo has learned about the user. Each rule only says what it sees; none of them decides what
 // reaches the user. That is the PA's job (pa.ts).
 
+import type { Factor, FactorKey } from './blood-work';
 import { addDays, dayStart, formatClock } from './day';
 import {
   behind,
@@ -42,6 +43,7 @@ export const INSIGHT_KINDS = [
   'weekly_review',
   'quiet_days',
   'on_track',
+  'blood_work',
 ] as const;
 export type InsightKind = (typeof INSIGHT_KINDS)[number];
 
@@ -120,6 +122,8 @@ export type PaContext = {
   sleepSource?: 'health' | 'screen' | 'none';
   /** Usage access: granted, not granted, or not in this build. */
   usageAccess?: 'granted' | 'denied' | 'unavailable';
+  /** The latest report added and the familiar factors of all reports. */
+  bloodWork?: { reportId: string; addedDay: string; factors: readonly Factor[] } | null;
 };
 
 export type WeekStats = { days: number; avg: number; prevAvg: number | null };
@@ -450,6 +454,60 @@ export function quietDays(ctx: PaContext, day: string, at: number): Signal {
   };
 }
 
+/** A new report is worth one brief for this many days (the day it's added and the two after). */
+const REPORT_BRIEF_DAYS = 3;
+/**
+ * Which factors move with each plan goal: the PA speaks about these first. The goal stays one
+ * goal (the user's plan); this only orders what a report says.
+ */
+const GOAL_FIRST: Record<'lose' | 'maintain' | 'gain', readonly FactorKey[]> = {
+  lose: ['blood_sugar', 'cholesterol'],
+  maintain: [],
+  gain: ['haemoglobin', 'b12', 'vitamin_d'],
+};
+
+/**
+ * After a report is added: one thing from it, ready to act on. Far outside a range comes first
+ * (a doctor), then what moves with the plan's goal, then the usual order; all in range says so.
+ * Once seen and acted on or passed over, that report says nothing more.
+ */
+function bloodWorkBrief(ctx: PaContext): Signal | null {
+  const bw = ctx.bloodWork;
+  if (!bw || dayGap(bw.addedDay, ctx.day) >= REPORT_BRIEF_DAYS) return null;
+  const tag = bw.reportId.slice(0, 8);
+  const done = ctx.history.some(
+    (r) => r.type === 'blood_work' && r.id.endsWith(tag) && (r.state === 'acted' || r.state === 'ignored'),
+  );
+  if (done) return null;
+  const known = bw.factors.filter((f) => f.lead.state);
+  if (known.length === 0) return null;
+  const first = GOAL_FIRST[ctx.facts.goal ?? 'maintain'];
+  const rank = (f: Factor) => (f.lead.far ? 0 : first.includes(f.key) ? 1 : 2);
+  const outside = known
+    .filter((f) => f.lead.state !== 'inside')
+    .sort((a, b) => rank(a) - rank(b));
+  const focus = outside[0];
+  return {
+    id: `${ctx.day}:blood_work:${tag}`,
+    type: 'blood_work',
+    severity: !focus ? 25 : focus.lead.far ? 60 : 45,
+    reason: 'A report says the most once, while it is new.',
+    action: { kind: 'blood_work' },
+    expiresAt: atHour(ctx, 27.5),
+    tab: null,
+    facts: focus
+      ? {
+          focus: focus.lead.far ? 'far' : 'care',
+          name: focus.label,
+          step: focus.advice ?? '',
+        }
+      : { focus: 'in_range' },
+  };
+}
+
+const dayGap = (from: string, to: string) =>
+  Math.round((dayStart(to).getTime() - dayStart(from).getTime()) / 86_400_000);
+
 /** The brief when nothing else passes: the day is fine, nothing needs the user. */
 export function onTrack(ctx: PaContext): Signal {
   return {
@@ -478,5 +536,6 @@ export function detectSignals(ctx: PaContext, weighDue: boolean): Signal[] {
     usageAsk(ctx),
     sleepPatternBrief(ctx),
     weeklyReview(ctx),
+    bloodWorkBrief(ctx),
   ].filter((s): s is Signal => s != null);
 }

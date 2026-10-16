@@ -50,6 +50,7 @@ export const CHANNEL_OF: Record<InsightKind, NotifyChannel> = {
   weekly_review: 'review',
   quiet_days: 'review',
   on_track: 'review',
+  blood_work: 'review',
 };
 
 export type MomentKind =

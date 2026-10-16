@@ -174,6 +174,7 @@ function openFor(action: NextAction) {
     if (action?.kind === 'log')
       router.navigate({ pathname: '/log', params: { note: action.note } });
     else if (action?.kind === 'weigh') router.push('/weigh-in');
+    else if (action?.kind === 'blood_work') router.push('/reports');
     else router.navigate('/');
   }, 300);
 }

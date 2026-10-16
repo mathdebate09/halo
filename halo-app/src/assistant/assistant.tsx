@@ -17,6 +17,7 @@ import {
   brief,
   type Brief,
   dayHour,
+  dayKey,
   dayStart,
   nightShape,
   type PaContext,
@@ -25,6 +26,7 @@ import {
   type WeekStats,
 } from '@/shared';
 import { useHaloTheme } from '@/theme/theme-provider';
+import { useAddedReports, useLabResults } from '@/reports/lab-data';
 import { useTodayScores } from '@/today/today-scores';
 
 import { useDailyScoreWriter } from './daily-score';
@@ -163,6 +165,12 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     [day],
   );
   const [wakeAskDone] = useMMKVBoolean(WAKE_ASK_DONE_KEY, kv);
+  // The newest report added, for its one brief while it's new.
+  const { factors: bloodFactors } = useLabResults();
+  const newestReport = useAddedReports().reduce<{ id: string; createdAt: number } | null>(
+    (n, r) => (n == null || r.createdAt > n.createdAt ? r : n),
+    null,
+  );
   const installed = installDay();
 
   const weekend = isWeekend(day);
@@ -196,6 +204,13 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     nights,
     sleepSource: hcNights.length ? 'health' : screenNights.length ? 'screen' : 'none',
     usageAccess: access,
+    bloodWork: newestReport
+      ? {
+          reportId: newestReport.id,
+          addedDay: dayKey(new Date(newestReport.createdAt)),
+          factors: bloodFactors,
+        }
+      : null,
   };
 
   const heldId = kv.getString(HELD_KEY) ?? null;

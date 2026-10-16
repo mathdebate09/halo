@@ -131,6 +131,24 @@ const COPY: Record<Signal['type'], (s: Signal) => InsightCopy> = {
     line: 'Nothing needs you right now.',
     actionLabel: null,
   }),
+  blood_work: ({ facts: f }) =>
+    f.focus === 'in_range'
+      ? {
+          tagline: 'Blood work in range',
+          line: 'Everything on your report is in range. The same routine keeps it there.',
+          actionLabel: 'See blood work',
+        }
+      : f.focus === 'far'
+        ? {
+            tagline: `${f.name} needs a closer look`,
+            line: 'Worth showing your doctor. Take this report along.',
+            actionLabel: 'See blood work',
+          }
+        : {
+            tagline: `${f.name} needs care`,
+            line: String(f.step),
+            actionLabel: 'See blood work',
+          },
 };
 
 /** A fact the words show as a live value: any non-zero number, or text with a digit (a time). */

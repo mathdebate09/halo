@@ -40,6 +40,7 @@ export type NextAction =
   | { kind: 'weigh' }
   | { kind: 'ask_wake' }
   | { kind: 'usage_access' }
+  | { kind: 'blood_work' }
   | null;
 
 export type Panel = {
