@@ -43,6 +43,7 @@ import { revertActed } from '@/assistant/loop-store';
 import {
   cancelSnoozes,
   LAST_RESPONSE_KEY,
+  playDay,
   readScheduled,
   sendRealTest,
   sendTestOfNext,
@@ -477,6 +478,10 @@ function NotifyPlanRow() {
       ]
         .filter(Boolean)
         .join('\n')}>
+      <Btn
+        label="Play the day"
+        onPress={() => playDay().then(setStatus, (e) => setStatus(errorText(e)))}
+      />
       <Btn
         label="Test next in 10 s"
         onPress={() => sendTestOfNext().then(setStatus, (e) => setStatus(errorText(e)))}

@@ -11,7 +11,14 @@ import { inQuietHours, usualHour, wrapHour } from './learning';
 import { IGNORE_LIMIT, ignoredStreak, outcomeLine } from './loop';
 import { rankSignals } from './pa';
 import { expectedDayFraction, expectedIntakeFraction } from './scoring';
-import { bedtimeOf, type Insight, type InsightKind, type PaContext, quietDays } from './signals';
+import {
+  bedtimeOf,
+  type Insight,
+  type InsightKind,
+  type PaContext,
+  quietDays,
+  type Signal,
+} from './signals';
 
 export const MAX_PER_DAY = 6;
 const HOUR_MS = 3_600_000;
@@ -143,6 +150,33 @@ function muted(ctx: PaContext, type: InsightKind): boolean {
   return last > addDays(ctx.day, -MUTE_DAYS);
 }
 
+/** What the PA would send for `moment` at `at`: the best ranked brief that moment may carry. */
+function momentFor(
+  ctx: PaContext,
+  moment: MomentKind,
+  at: number,
+  allow: (signal: Signal) => boolean = () => true,
+): Moment | null {
+  const view = projectAt(ctx, at);
+  const pick = rankSignals(view).ranked.find(
+    ({ signal }) =>
+      CARRIES[moment].includes(signal.type) &&
+      (moment === 'breakfast' || moment === 'lunch' || moment === 'dinner'
+        ? signal.facts.meal === moment
+        : true) &&
+      allow(signal),
+  );
+  if (!pick) return null;
+  return {
+    at,
+    day: ctx.day,
+    moment,
+    insight: { ...pick.signal, copy: briefCopy(pick.signal) },
+    lead: moment === 'weigh_in' ? outcomeLine(view) : null,
+    channel: CHANNEL_OF[pick.signal.type],
+  };
+}
+
 type Candidate = {
   moment: MomentKind;
   /** Earliest and latest clock hour (may pass 24 for after midnight). */
@@ -210,26 +244,17 @@ export function planDay(ctx: PaContext, delivered: readonly Delivered[] = []): M
     if (hour > c.until) continue;
     if (inQuietHours(hour, bed, wake)) continue;
     const at = atClock(hour);
-    const view = projectAt(ctx, at);
-    const pick = rankSignals(view).ranked.find(
-      ({ signal }) =>
-        CARRIES[c.moment].includes(signal.type) &&
-        (c.moment === 'breakfast' || c.moment === 'lunch' || c.moment === 'dinner'
-          ? signal.facts.meal === c.moment
-          : true) &&
+    const moment = momentFor(
+      ctx,
+      c.moment,
+      at,
+      (signal) =>
         !sent.has(signal.id) &&
         !planned.some((p) => p.insight.id === signal.id) &&
         !muted(ctx, signal.type),
     );
-    if (!pick) continue;
-    planned.push({
-      at,
-      day: ctx.day,
-      moment: c.moment,
-      insight: { ...pick.signal, copy: briefCopy(pick.signal) },
-      lead: c.moment === 'weigh_in' ? outcomeLine(view) : null,
-      channel: CHANNEL_OF[pick.signal.type],
-    });
+    if (!moment) continue;
+    planned.push(moment);
     taken.push(at);
   }
 
@@ -265,4 +290,37 @@ export function planDay(ctx: PaContext, delivered: readonly Delivered[] = []): M
     });
   }
   return planned.sort((a, b) => a.at - b.at);
+}
+
+/**
+ * Demo mode (SPEC §4): the day's four moments, morning, lunch, afternoon and evening, each as the
+ * PA would send it at that hour today, assuming nothing more gets logged. The caps (six a day,
+ * spacing, quiet hours, already sent, muted) don't apply: this shows the day in a minute.
+ */
+export function dayMoments(ctx: PaContext): Moment[] {
+  const bed = bedtimeOf(ctx).hour;
+  const slots: [MomentKind, number][][] = [
+    [
+      ['weigh_in', ctx.wake.value + 0.25],
+      ['breakfast', usualHour(ctx.windows, 'breakfast') - 0.25],
+    ],
+    [['lunch', usualHour(ctx.windows, 'lunch') - 0.25]],
+    [['pace', 17]],
+    [
+      ['bedtime', (bed < 12 ? bed + 24 : bed) - 0.5],
+      ['wrap_up', 21],
+    ],
+  ];
+  const moments: Moment[] = [];
+  for (const options of slots) {
+    for (const [moment, hour] of options) {
+      const at = ctx.now + (hour - ctx.hour) * HOUR_MS;
+      const found = momentFor(ctx, moment, at, (s) => !moments.some((m) => m.insight.id === s.id));
+      if (found) {
+        moments.push(found);
+        break;
+      }
+    }
+  }
+  return moments;
 }

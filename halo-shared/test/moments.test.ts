@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { formatClock, hourOfDay } from '../src/day';
 import type { DayFacts } from '../src/insights';
-import { type Delivered, MAX_PER_DAY, planDay } from '../src/moments';
+import { dayMoments, type Delivered, MAX_PER_DAY, planDay } from '../src/moments';
 import { DEFAULT_MEAL_WINDOWS } from '../src/scoring';
 import type { InsightRecord, PaContext } from '../src/signals';
 
@@ -163,4 +163,40 @@ describe('planDay', () => {
     expect(clock(review.at)).toBe('19:00');
     expect(review.insight.copy.line).toBe('You averaged 74 over 7 days, 6 up on last week.');
   });
+});
+
+describe('dayMoments', () => {
+  const kinds = (c: PaContext) =>
+    dayMoments(c).map((m) => `${clock(m.at)} ${m.moment}:${m.insight.type}`);
+
+  it('plays the four moments of an empty day, whatever the time now', () => {
+    expect(kinds(ctx(15, 0))).toEqual([
+      '07:15 weigh_in:weigh_in',
+      '13:00 lunch:meal_window',
+      '17:00 pace:water_pace',
+      '22:30 bedtime:bedtime',
+    ]);
+  });
+
+  it('ignores the caps: a kind swiped away three times still plays', () => {
+    const history: InsightRecord[] = [11, 12, 13].map((d) => ({
+      id: `2026-10-${d}:water_pace`,
+      day: `2026-10-${d}`,
+      type: 'water_pace',
+      state: 'ignored',
+      severity: 40,
+      shownAt: d,
+      actedAt: null,
+      resolvedAt: null,
+      expiresAt: null,
+    }));
+    expect(kinds(ctx(15, 0, { history }))).toContain('17:00 pace:water_pace');
+  });
+
+  it('falls back within a slot: weighed today → breakfast; lunch logged → no lunch moment', () => {
+    const out = kinds(ctx(15, 0, { weighedToday: true }, { mealsLogged: 1, loggedTypes: ['lunch'] }));
+    expect(out[0]).toMatch(/breakfast:meal_window$/);
+    expect(out.some((k) => k.includes('lunch'))).toBe(false);
+  });
+
 });

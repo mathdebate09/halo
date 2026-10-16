@@ -15,11 +15,13 @@ import { kv } from '@/lib/kv';
 import {
   bedtimeOf,
   dayKey,
+  dayMoments,
   type Delivered,
   type Goal,
   hourOfDay,
   inSpan,
   keepUnits,
+  type Moment,
   type NotifyChannel,
   NOTIFY_CHANNELS,
   type NextAction,
@@ -315,12 +317,37 @@ async function reconcile(now: number): Promise<Scheduled[]> {
 let running = false;
 let again: (() => void) | null = null;
 
+/** A moment in the brief's words at its hour (reworded when cached), as the tray shows it. */
+function wordMoment(m: Moment, tier: Tier, goal: Goal) {
+  const item = phraseItemFor(m.insight, tier, hourOfDay(new Date(m.at)), goal);
+  const words = wordsFor(m.insight, item?.key ?? null);
+  const insight: NotifiedInsight = {
+    id: m.insight.id,
+    day: m.day,
+    type: m.insight.type,
+    severity: m.insight.severity,
+    reason: m.insight.reason,
+    action: m.insight.action,
+    expiresAt: m.insight.expiresAt,
+  };
+  return {
+    title: keepUnits(words.tagline),
+    body: keepUnits(m.lead ? `${m.lead} ${words.line}` : words.line),
+    insight,
+    item,
+  };
+}
+
+/** The last context the plan was made from, for the dev screen's Play the day. */
+let latestPlan: { ctx: PaContext; tier: Tier; goal: Goal } | null = null;
+
 /**
  * Re-plans the notifications from the PA's current view: reads back what happened, cancels what
  * was planned, and schedules the new plan in the brief's words (reworded when cached). Runs one
  * at a time; a call during a run is replayed once it ends.
  */
 export async function reschedule(ctx: PaContext, tier: Tier, goal: Goal) {
+  latestPlan = { ctx, tier, goal };
   if (running) {
     again = () => void reschedule(ctx, tier, goal);
     return;
@@ -351,20 +378,8 @@ export async function reschedule(ctx: PaContext, tier: Tier, goal: Goal) {
     const next: Scheduled[] = [...snoozes];
     const items = [];
     for (const m of plan) {
-      const item = phraseItemFor(m.insight, tier, hourOfDay(new Date(m.at)), goal);
+      const { title, body, insight, item } = wordMoment(m, tier, goal);
       if (item) items.push(item);
-      const words = wordsFor(m.insight, item?.key ?? null);
-      const title = keepUnits(words.tagline);
-      const body = keepUnits(m.lead ? `${m.lead} ${words.line}` : words.line);
-      const insight: NotifiedInsight = {
-        id: m.insight.id,
-        day: m.day,
-        type: m.insight.type,
-        severity: m.insight.severity,
-        reason: m.insight.reason,
-        action: m.insight.action,
-        expiresAt: m.insight.expiresAt,
-      };
       const payload: Payload = { halo: 1, insight, channel: m.channel, quiet };
       const nid = await Notifications.scheduleNotificationAsync({
         content: { title, body, data: payload, categoryIdentifier: categoryFor(m.insight.action) },
@@ -449,6 +464,44 @@ export async function sendRealTest(): Promise<string> {
     { nid, at, title, body, insight, channel, snooze: true },
   ]);
   return `real in 10 s: ${title} (${nid.slice(0, 8)})`;
+}
+
+const PLAY_GAP_S = 8;
+
+/**
+ * Dev screen, demo mode (SPEC §4): the day's four moments (morning, lunch, afternoon, evening) as
+ * real notifications, 8 seconds apart, each worded for its own hour. Registered like the real
+ * test, so their buttons act for real. Leave the app after the tap: Halo stays quiet in the
+ * foreground.
+ */
+export async function playDay(): Promise<string> {
+  if (!latestPlan) return 'no plan yet: open Today first';
+  if (!(await Notifications.getPermissionsAsync()).granted) return 'notifications are off';
+  const { ctx, tier, goal } = latestPlan;
+  const moments = dayMoments(ctx);
+  if (!moments.length) return 'nothing to play';
+  const quiet: [number, number] = [0, 0];
+  const added: Scheduled[] = [];
+  for (const [i, m] of moments.entries()) {
+    const { title, body, insight, item } = wordMoment(m, tier, goal);
+    if (item) requestPhrases([item]);
+    const at = Date.now() + (i + 1) * PLAY_GAP_S * 1000;
+    const payload: Payload = { halo: 1, insight, channel: m.channel, quiet };
+    const nid = await Notifications.scheduleNotificationAsync({
+      content: { title, body, data: payload, categoryIdentifier: categoryFor(m.insight.action) },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: new Date(at),
+        channelId: m.channel,
+      },
+    });
+    // Marked as snoozes so the next re-plan keeps them instead of cancelling them.
+    added.push({ nid, at, title, body, insight, channel: m.channel, snooze: true });
+  }
+  write(SCHEDULED_KEY, [...read<Scheduled[]>(SCHEDULED_KEY, []), ...added]);
+  return moments
+    .map((m, i) => `+${(i + 1) * PLAY_GAP_S}s ${m.moment}: ${added[i].title}`)
+    .join('\n');
 }
 
 /** Dev screen, test phase: cancels snoozed notifications (the real tests register as snoozes). */
