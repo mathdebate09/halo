@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, use, useEffect, useRef, useState } from 'react';
-import { type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Appearance, type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 import {
   interpolateColor,
   type SharedValue,
@@ -82,7 +82,11 @@ export function HaloThemeProvider({ children }: { children: ReactNode }) {
     swapTimer.current = setTimeout(() => setApplied(next), motion.themeFade / 2);
   };
 
-  useEffect(() => setStatusBarMode(target.mode), [target.mode]);
+  useEffect(() => {
+    setStatusBarMode(target.mode);
+    // System dialogs and pickers follow the app's mode, not the phone's.
+    Appearance.setColorScheme(target.mode);
+  }, [target.mode]);
 
   const theme = themeIn(applied.id, applied.mode);
   const value: ThemeContextValue = {
