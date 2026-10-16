@@ -12,7 +12,7 @@ import { WHEEL_ITEM_HEIGHT, WheelPicker } from '@/components/wheel-picker';
 import { db } from '@/db/client';
 import { deleteRecord, upsertRecord } from '@/db/mutate';
 import { vitalsReadings } from '@/db/schema';
-import { dayStart } from '@/shared';
+import { dayKey, dayStart } from '@/shared';
 import { SLEEP_METRIC } from '@/vitals/inputs';
 
 // The one-tap correction for a night Halo estimated from phone use (SPEC §6: the user can correct
@@ -36,8 +36,9 @@ const idFor = (day: string) => `sleep-${day}`;
 
 export default function SleepHoursSheet() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ day: string; hours?: string }>();
-  const day = params.day;
+  const params = useLocalSearchParams<{ day?: string; hours?: string }>();
+  // Opened without a night: today's (the night just gone).
+  const day = params.day || dayKey(new Date());
   const id = idFor(day);
   // Read once, synchronously, so the sheet opens at its final height.
   const [corrected] = useState(() => {

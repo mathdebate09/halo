@@ -13,8 +13,16 @@ import { db } from '@/db/client';
 import { deleteRecord, upsertRecord } from '@/db/mutate';
 import { type StoredAdvisorCard as StoredCard, weights } from '@/db/schema';
 import { emitMealLogged } from '@/meals/events';
-import { type AdvisorCard, dayKey, displayWeight, formatClock, round } from '@/shared';
+import {
+  type AdvisorCard,
+  dayKey,
+  displayWeight,
+  formatClock,
+  round,
+  vitalsDetail,
+} from '@/shared';
 
+import { readAdvisorSources } from './sources';
 import type { AdvisorMessage } from './thread';
 
 export type { StoredAdvisorCard as StoredCard } from '@/db/schema';
@@ -188,11 +196,26 @@ export async function actOnCard(card: StoredCard, message: AdvisorMessage) {
       return;
     }
     case 'open':
-      if (card.target === 'sleep_hours') router.push('/sleep-hours');
+      if (card.target === 'sleep_hours') openSleepHours();
       else if (card.target === 'log') runAction({ kind: 'log', note: '' });
       else runAction({ kind: card.target });
       return;
   }
+}
+
+/** The night Vitals would correct (its day and the estimate), as Vitals' sleep row opens it. */
+function openSleepHours() {
+  const scores = readAdvisorSources()?.scores;
+  const row = scores
+    ? vitalsDetail(scores.vitalsInput, scores.vitalsReport).rows.find((r) => r.key === 'sleep')
+    : undefined;
+  router.push({
+    pathname: '/sleep-hours',
+    params: {
+      day: row?.day ?? scores?.day ?? dayKey(new Date()),
+      ...(row ? { hours: String(row.value) } : {}),
+    },
+  });
 }
 
 /** The correction a done card offers in place: Undo, or View for a logged meal (fixed there). */
