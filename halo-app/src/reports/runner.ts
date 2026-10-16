@@ -1,22 +1,26 @@
 // Reads a report's pages in the background, the way meals/analysis.ts reads meal photos: each page
 // becomes a job on the server (text layer or tiles, see pages.ts), polled with backoff, up to four
 // at once. Page results are kept on the device as they land, so a restart picks up the missing
-// pages. When every page is in, the pages merge into one report for the user to check
-// (status "review"); nothing counts until they confirm it (20e). The picked file is deleted at
-// the end and never leaves the phone; a password lives only in memory.
+// pages. When every page is in, the pages merge into one report and its values go straight into
+// Vitals, each on the date the report printed (a wrong number is fixed later on the report's
+// screen). The picked file is deleted at the end and never leaves the phone; a password lives only
+// in memory.
 
 import NetInfo from '@react-native-community/netinfo';
 import { and, eq, inArray, isNull, like, lte } from 'drizzle-orm';
 import { randomUUID } from 'expo-crypto';
 import { File } from 'expo-file-system';
+import { router } from 'expo-router';
 import { AppState } from 'react-native';
 
+import { showToast } from '@/components/toast';
 import { db } from '@/db/client';
 import { deleteRecord, upsertRecord } from '@/db/mutate';
 import { jobs, type ReportProgress, reports } from '@/db/schema';
 import { kv } from '@/lib/kv';
 import { readProfile } from '@/lib/plan';
 import {
+  dayKey,
   type JobView,
   mergeReport,
   REPORT_LIMITS,
@@ -26,6 +30,7 @@ import {
 } from '@/shared';
 import { api, ApiError } from '@/sync/api';
 
+import { writeValues } from './confirm';
 import { discard, preparePage, type ReportSource, tilesBase64 } from './pages';
 
 type Report = typeof reports.$inferSelect;
@@ -292,18 +297,39 @@ async function poll(job: typeof jobs.$inferSelect) {
 }
 
 /** Every page in: merge them for the confirm step, or fail when none had a result. */
+/**
+ * Every page in: the values go into Vitals on the dates the report printed (a value without its
+ * own date takes the report's; a report with no date at all, the day it was added). Where one
+ * test was read two ways, the surer reading counts.
+ */
 function finish(report: Report, run: Run) {
   const pages = Object.values(run.pages).filter((p): p is ReportPage => p !== 'skip');
   const merged = mergeReport(pages, readProfile()?.sex ?? null);
-  if (merged.values.length === 0) return fail(report.id, 'no_results');
+  const values = merged.values.filter((v) => v.include);
+  if (values.length === 0) return fail(report.id, 'no_results');
+  const fallback = merged.reportDate ?? dayKey(new Date());
+  const added = writeValues(
+    report.id,
+    values.map((v) => ({ ...v, date: v.date ?? fallback })),
+  );
+  cleanUp(report.id, run);
+  // Every value was already there (the same visit added before): nothing new to keep a report for.
+  if (added === 0) {
+    deleteRecord('report', report.id);
+    showToast('This report is already in Vitals');
+    return;
+  }
   patchReport(report, {
-    status: 'review',
-    extracted: merged,
-    reportDate: merged.reportDate,
+    status: 'confirmed',
+    extracted: null,
+    reportDate: merged.dates[0] ?? fallback,
     progress: { done: run.total, total: run.total, ...(run.capped ? { capped: true } : {}) },
     error: null,
   });
-  cleanUp(report.id, run);
+  showToast('Report added to Vitals', {
+    label: 'View',
+    onPress: () => router.push('/reports'),
+  });
 }
 
 const filesThere = (run: Run) => sourceUris(run).every((uri) => new File(uri).exists);
@@ -442,7 +468,7 @@ export function startReportReading() {
 }
 
 /** Reports the card shows. */
-export const CARD_STATUSES = ['analysing', 'review', 'failed'] as const;
+export const CARD_STATUSES = ['analysing', 'failed'] as const;
 
 /** Whether a report with this file is already here (being read, waiting or confirmed). */
 export function existingReport(hash: string): Report | undefined {
@@ -452,7 +478,7 @@ export function existingReport(hash: string): Report | undefined {
     .where(
       and(
         eq(reports.pdfHash, hash),
-        inArray(reports.status, ['analysing', 'review', 'confirmed']),
+        inArray(reports.status, ['analysing', 'confirmed']),
         isNull(reports.deletedAt),
       ),
     )

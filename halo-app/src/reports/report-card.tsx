@@ -1,6 +1,6 @@
 import { and, desc, inArray, isNull } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { router, useIsFocused } from 'expo-router';
+import { useIsFocused } from 'expo-router';
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import Animated, {
@@ -22,7 +22,6 @@ import { PressScale } from '@/components/press-scale';
 import { setToastLift } from '@/components/toast';
 import { db } from '@/db/client';
 import { reports } from '@/db/schema';
-import type { MergedReport } from '@/shared';
 import { useHaloTheme } from '@/theme/theme-provider';
 
 import { CARD_STATUSES, dismissReport, type ReportError, RETRYABLE, retryReport } from './runner';
@@ -42,9 +41,9 @@ const ERROR_LINES: Record<ReportError, string> = {
 const pages = (n: number) => `${n} page${n === 1 ? '' : 's'}`;
 
 /**
- * A report between pick and confirm, as one slim card above the dock on Vitals: pages read so far
- * with a thin line, then "Ready to check" (the confirm step opens from here, 20e), or why it
- * couldn't be read with Retry when trying later can work.
+ * A report being read, as one slim card above the dock on Vitals: pages read so far with a thin
+ * line, or why it couldn't be read with Retry when trying later can work. Once read, its values go
+ * into Vitals and the card leaves (a toast offers to view them).
  */
 export function ReportCard() {
   const insets = useSafeAreaInsets();
@@ -64,9 +63,8 @@ export function ReportCard() {
       .orderBy(desc(reports.createdAt)),
   );
 
-  // The ones waiting on the user first.
-  const first =
-    data.find((r) => r.status === 'review') ?? data.find((r) => r.status === 'failed') ?? data[0];
+  // A failure needs the user; it shows before one still being read.
+  const first = data.find((r) => r.status === 'failed') ?? data[0];
   const visible = !!first;
   useEffect(() => {
     setToastLift('report-card', visible && focused ? CARD_HEIGHT + 8 : 0);
@@ -76,22 +74,14 @@ export function ReportCard() {
 
   const more = data.length - 1;
   const progress = first.progress ?? { done: 0, total: 0 };
-  const values = (first.extracted as MergedReport | null)?.values.length ?? 0;
   const error = (first.error ?? 'error') as ReportError;
-  const title =
-    first.status === 'analysing'
-      ? 'Reading your report'
-      : first.status === 'review'
-        ? 'Ready to check'
-        : 'Couldn’t read this report';
+  const title = first.status === 'analysing' ? 'Reading your report' : 'Couldn’t read this report';
   const line =
     first.status === 'analysing'
       ? progress.done === 0
         ? pages(progress.total)
         : `${progress.done} of ${pages(progress.total)}`
-      : first.status === 'review'
-        ? `${values} value${values === 1 ? '' : 's'}${progress.capped ? ', from the first 12 pages' : ''}`
-        : ERROR_LINES[error];
+      : ERROR_LINES[error];
   const retryable = first.status === 'failed' && RETRYABLE.includes(error);
 
   return (
@@ -105,14 +95,10 @@ export function ReportCard() {
         bottom: insets.bottom + 12 + DOCK_HEIGHT + 12,
       }}>
       <View className="flex-row items-center rounded-pill border border-hairline/10 bg-surface p-2 pr-3">
-        {/* A report ready to check opens the confirm step; the actions stay their own buttons. */}
-        <PressScale
-          accessibilityRole={first.status === 'review' ? 'button' : 'text'}
+        <View
+          accessible
           accessibilityLabel={`${title}. ${line}${more > 0 ? `, and ${more} more` : ''}`}
-          disabled={first.status !== 'review'}
-          onPress={() => router.push({ pathname: '/report/[id]', params: { id: first.id } })}
-          pressableStyle={{ flex: 1 }}
-          className="flex-row items-center">
+          className="flex-1 flex-row items-center">
           <View className="h-11 w-11 items-center justify-center rounded-full bg-glass/10">
             <ReportIcon size={20} color={theme.colors.text} />
           </View>
@@ -137,7 +123,7 @@ export function ReportCard() {
           {more > 0 ? (
             <Text className="mr-2 font-sans-medium text-[13px] text-muted">+{more}</Text>
           ) : null}
-        </PressScale>
+        </View>
         {/* The actions change with the state, so they cross in with the words. */}
         <LayoutAnimationConfig skipEntering>
           <Animated.View
@@ -156,7 +142,7 @@ export function ReportCard() {
             {first.status !== 'analysing' ? (
               <PressScale
                 accessibilityRole="button"
-                accessibilityLabel={first.status === 'review' ? 'Discard this report' : 'Dismiss'}
+                accessibilityLabel="Dismiss"
                 onPress={() => dismissReport(first.id)}
                 hitSlop={10}
                 className="h-9 w-9 items-center justify-center">

@@ -1,36 +1,32 @@
-// The confirm step's writes. A report's values count only once the user adds them: each kept value
-// becomes a confirmed vital reading (source "report") on its own test date, and the report is
-// marked confirmed. Removing a confirmed report takes its readings with it.
+// A read report's writes. Its values go straight into Vitals: each becomes a confirmed reading
+// (source "report") on the date the report printed for it. A wrong number is fixed afterwards on
+// the report's own screen; removing a report takes its readings with it.
 
 import { and, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/db/client';
 import { deleteRecord, upsertRecord } from '@/db/mutate';
-import { reports, vitalsReadings } from '@/db/schema';
+import { vitalsReadings } from '@/db/schema';
 import { dayKey, dayStart, type ReportValue } from '@/shared';
 
-/** A value as the user left it on the confirm screen. */
-export type KeptValue = ReportValue & { date: string };
+/** A value with the date it lands on. */
+export type DatedValue = ReportValue & { date: string };
 
 /** Same test, same day, same value already stored (another PDF of the same visit). */
-function alreadyThere(v: KeptValue): boolean {
-  const day = dayStart(v.date, 12).getTime();
+function alreadyThere(v: DatedValue): boolean {
+  const day = dayKey(dayStart(v.date, 12));
   return db
     .select({ at: vitalsReadings.at, value: vitalsReadings.value })
     .from(vitalsReadings)
     .where(and(eq(vitalsReadings.metric, v.metric), isNull(vitalsReadings.deletedAt)))
     .all()
-    .some(
-      (r) => dayKey(new Date(r.at)) === dayKey(new Date(day)) && Math.abs(r.value - v.value) < 1e-6,
-    );
+    .some((r) => dayKey(new Date(r.at)) === day && Math.abs(r.value - v.value) < 1e-6);
 }
 
-/** Writes the kept values and marks the report confirmed. Returns how many were added. */
-export function confirmReport(reportId: string, kept: readonly KeptValue[]): number {
-  const report = db.select().from(reports).where(eq(reports.id, reportId)).get();
-  if (!report || report.deletedAt != null || report.status !== 'review') return 0;
+/** Writes a report's values as readings; returns how many were new. */
+export function writeValues(reportId: string, values: readonly DatedValue[]): number {
   let added = 0;
-  for (const v of kept) {
+  for (const v of values) {
     if (alreadyThere(v)) continue;
     upsertRecord('vitalReading', {
       metric: v.metric,
@@ -50,20 +46,23 @@ export function confirmReport(reportId: string, kept: readonly KeptValue[]): num
     });
     added++;
   }
-  const dates = kept.map((v) => v.date).sort();
-  const { createdAt: _c, updatedAt: _u, deletedAt: _d, syncState: _s, ...fields } = report;
-  upsertRecord('report', {
-    ...fields,
-    status: 'confirmed',
-    // The most recent test date names the report; the values themselves are readings now.
-    reportDate: dates.at(-1) ?? report.reportDate,
-    extracted: null,
-    error: null,
-  });
   return added;
 }
 
-/** Deletes a confirmed report and every reading it added. */
+/** A number the report was read wrong on, fixed by the user (in the stored unit). */
+export function fixReading(id: string, value: number) {
+  const row = db.select().from(vitalsReadings).where(eq(vitalsReadings.id, id)).get();
+  if (!row || row.deletedAt != null) return;
+  const { createdAt: _c, updatedAt: _u, deletedAt: _d, syncState: _s, ...fields } = row;
+  upsertRecord('vitalReading', {
+    ...fields,
+    value,
+    qualifier: null,
+    raw: [String(value), row.unit].filter(Boolean).join(' '),
+  });
+}
+
+/** Deletes a report and every reading it added. */
 export function removeReport(reportId: string) {
   const readings = db
     .select({ id: vitalsReadings.id })
