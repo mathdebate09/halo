@@ -1,6 +1,6 @@
 import { desc, eq, gte } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import {
   type ComponentType,
   type ReactNode,
@@ -27,7 +27,6 @@ import {
   YogaIcon,
 } from '@/components/icons';
 import { PressScale } from '@/components/press-scale';
-import { SegmentedToggle } from '@/components/segmented-toggle';
 import { ThemedScreen } from '@/components/themed-screen';
 import { db } from '@/db/client';
 import { hcDaily } from '@/db/schema';
@@ -72,11 +71,6 @@ import { useTodayScores } from '@/today/today-scores';
 // hc_daily cache (de-duplicated by Health Connect itself), hours are read on demand, sessions
 // from the last two weeks. Burned calories are shown, never added to the food target.
 
-type Tab = 'health' | 'tracker';
-const TABS = [
-  { id: 'health' as const, label: 'Health Connect' },
-  { id: 'tracker' as const, label: 'HaloTracker' },
-];
 const PLAY_STORE = 'market://details?id=com.google.android.apps.healthdata';
 const WEEKDAY_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -85,11 +79,6 @@ export default function ExerciseScreen() {
   const dockInset = useDockInset();
   const { theme } = useHaloTheme();
   const scores = useTodayScores();
-  const params = useLocalSearchParams<{ tracker?: string }>();
-  const [tab, setTab] = useState<Tab>(params.tracker === '1' ? 'tracker' : 'health');
-  useEffect(() => {
-    if (params.tracker === '1') setTab('tracker');
-  }, [params.tracker]);
   const [selected, setSelected] = useState(scores.day);
   // A new day (4 am) moves the selection along with it.
   useEffect(() => setSelected(scores.day), [scores.day]);
@@ -125,25 +114,13 @@ export default function ExerciseScreen() {
           }}>
           <View className="mt-8 px-1">
             <Text className="font-sans-medium text-[13px] tracking-[1px] text-muted">
-              {tab === 'health' ? dateLabel : ' '}
+              {dateLabel}
             </Text>
             <Text accessibilityRole="header" className="mt-1 font-serif text-[34px] text-text">
               Activity Analysis
             </Text>
           </View>
-          <View className="mt-4">
-            <SegmentedToggle
-              options={TABS}
-              value={tab}
-              onChange={setTab}
-              accessibilityLabel="Exercise source"
-            />
-          </View>
-          {tab === 'health' ? (
-            <HealthConnectView selected={selected} onSelect={setSelected} />
-          ) : (
-            <TrackerSoon />
-          )}
+          <HealthConnectView selected={selected} onSelect={setSelected} />
         </View>
       </ScrollView>
     </ThemedScreen>
@@ -222,17 +199,6 @@ function Climb({
         </PressScale>
       </View>
     </View>
-  );
-}
-
-function TrackerSoon() {
-  return (
-    <Animated.View entering={FadeIn.duration(300)} className="mt-[30%] items-center px-8">
-      <Text className="font-serif text-[34px] text-text">Coming soon</Text>
-      <Text className="mt-2 text-center font-sans text-[16px] leading-[24px] text-muted">
-        Track walks and workouts right here.
-      </Text>
-    </Animated.View>
   );
 }
 

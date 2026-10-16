@@ -263,11 +263,7 @@ export default function MealLogger() {
           />
           <Action label="Weigh-in" Icon={ScaleIcon} onPress={() => router.push('/weigh-in')} />
           <Action label="Advisor" Icon={ChatIcon} onPress={() => router.push('/advisor')} />
-          <Action
-            label="Workout"
-            Icon={RunIcon}
-            onPress={() => router.navigate({ pathname: '/exercise', params: { tracker: '1' } })}
-          />
+          <Action label="Workout" Icon={RunIcon} onPress={() => router.navigate('/exercise')} />
         </View>
       </View>
 
