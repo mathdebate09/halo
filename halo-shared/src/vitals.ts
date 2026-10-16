@@ -3,6 +3,7 @@
 // never empty and never a diagnosis: states are Thriving / Steady / Needs care for areas and
 // Strong / In range / Outside the usual range for single readings.
 
+import type { Factor } from './blood-work';
 import type { Source } from './learning';
 import {
   type ActivityDay,
@@ -49,6 +50,8 @@ export type VitalsDay = ActivityDay & {
   bodyFatPct?: number | null;
   vo2max?: number | null;
   weightKg?: number | null;
+  /** Fields this day that came from a lab report rather than a device (named so on their rows). */
+  fromReport?: readonly string[];
 };
 
 export type VitalsInput = {
@@ -65,21 +68,24 @@ export type VitalsInput = {
     /** Planned signed kg/week (negative = loss). */
     rateKgPerWeek?: number | null;
   };
+  /** The familiar blood-work factors from the user's reports (any age). */
+  blood?: readonly Factor[];
 };
 
-export type AreaKey = 'sleep' | 'heart' | 'movement' | 'screen' | 'body';
+export type AreaKey = 'sleep' | 'heart' | 'movement' | 'screen' | 'body' | 'blood';
 export type AreaState = 'thriving' | 'steady' | 'needs_care';
 
 /** Hero order when nothing needs care: the first three areas with data. */
-export const AREA_PRIORITY: readonly AreaKey[] = ['sleep', 'heart', 'movement', 'screen', 'body'];
+export const AREA_PRIORITY: readonly AreaKey[] = ['sleep', 'heart', 'movement', 'screen', 'body', 'blood'];
 /** How much each area counts toward the Vitals score. */
-export const AREA_WEIGHTS: Record<AreaKey, number> = { sleep: 3, heart: 2, movement: 2, screen: 1, body: 1 };
+export const AREA_WEIGHTS: Record<AreaKey, number> = { sleep: 3, heart: 2, movement: 2, screen: 1, body: 1, blood: 1 };
 export const AREA_LABELS: Record<AreaKey, string> = {
   sleep: 'Sleep',
   heart: 'Heart',
   movement: 'Movement',
   screen: 'Screen time',
   body: 'Body',
+  blood: 'Blood work',
 };
 
 export type MetricKey =
@@ -99,7 +105,8 @@ export type MetricKey =
   | 'steps_trend'
   | 'screen_late'
   | 'screen_daily'
-  | 'weight_trend';
+  | 'weight_trend'
+  | 'blood_work';
 
 export type VitalSignal = { key: MetricKey; score: number; weight: number; source: VitalsSource };
 
@@ -110,6 +117,8 @@ export type Area = {
   state: AreaState;
   /** Weighted mean confidence of its signals (0.3 when only assumed). */
   confidence: number;
+  /** A step of its own for the headline (blood work: the factor that needs care), else AREA_STEPS. */
+  step?: string;
   /** The best source behind it. */
   source: VitalsSource;
   signals: VitalSignal[];
@@ -422,6 +431,34 @@ function bodyArea(input: VitalsInput): Area {
   ])!;
 }
 
+/** A report this old still counts in full; up to a year, as an estimate; older, not at all. */
+const BLOOD_FRESH_DAYS = 90;
+const BLOOD_MAX_DAYS = 365;
+const daysBetween = (from: string, to: string) =>
+  Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
+
+/**
+ * Blood work from the familiar factors of the user's reports: in range scores well, outside it
+ * lower, far outside lowest. A report under three months old counts as measured, up to a year as
+ * estimated, older not at all. Never estimated without a report (no report, no area). Its step is
+ * the one of the first factor that needs care.
+ */
+function bloodArea(input: VitalsInput): Area | null {
+  const signals: VitalSignal[] = [];
+  let step: string | undefined;
+  for (const f of input.blood ?? []) {
+    const { state, far, day } = f.lead;
+    if (!state) continue;
+    const age = daysBetween(day, input.today);
+    if (age > BLOOD_MAX_DAYS) continue;
+    const score = state === 'inside' ? 90 : far ? 35 : 60;
+    signals.push({ key: 'blood_work', score, weight: 1, source: age <= BLOOD_FRESH_DAYS ? 'measured' : 'estimated' });
+    if (state !== 'inside' && f.advice && !step) step = f.advice;
+  }
+  const a = area('blood', signals);
+  return a && step ? { ...a, step } : a;
+}
+
 // ── The report ──────────────────────────────────────────────────────────────────
 
 /**
@@ -429,7 +466,14 @@ function bodyArea(input: VitalsInput): Area {
  * confidence and renormalized. Never empty: with nothing measured it is the medium prior.
  */
 export function vitalsReport(input: VitalsInput): VitalsReport {
-  const areas = [sleepArea(input), heartArea(input), movementArea(input), screenArea(input), bodyArea(input)].filter(
+  const areas = [
+    sleepArea(input),
+    heartArea(input),
+    movementArea(input),
+    screenArea(input),
+    bodyArea(input),
+    bloodArea(input),
+  ].filter(
     (a): a is Area => a != null,
   );
   let sum = 0;
@@ -490,6 +534,7 @@ const NOUN: Record<AreaKey, string> = {
   movement: 'movement',
   screen: 'evenings',
   body: 'weight trend',
+  blood: 'blood work',
 };
 const ADJECTIVE: Record<Exclude<AreaState, 'needs_care'>, string> = { thriving: 'Strong', steady: 'Steady' };
 
@@ -500,6 +545,7 @@ export const AREA_STEPS: Record<AreaKey, string> = {
   movement: 'A brisk walk today starts to turn the week.',
   screen: 'Phone away an hour before bed helps the night.',
   body: 'Steady meals on plan keep the trend moving your way.',
+  blood: 'The step under Blood work is the one to start with.',
 };
 export const ON_TRACK_STEP = 'The same routine tomorrow keeps it here.';
 
@@ -522,23 +568,23 @@ export function vitalsHeadline(areas: readonly Area[]): VitalsHeadline {
   if (weakest.state === 'needs_care' && best.key !== weakest.key && best.state !== 'needs_care') {
     return {
       headline: `${ADJECTIVE[best.state as 'thriving' | 'steady']} ${NOUN[best.key]}, with room in ${NOUN[weakest.key]}`,
-      line: AREA_STEPS[weakest.key],
+      line: weakest.step ?? AREA_STEPS[weakest.key],
       focus: weakest.key,
     };
   }
   if (weakest.state === 'needs_care') {
-    return { headline: `${cap(NOUN[weakest.key])} needs care first`, line: AREA_STEPS[weakest.key], focus: weakest.key };
+    return { headline: `${cap(NOUN[weakest.key])} needs care first`, line: weakest.step ?? AREA_STEPS[weakest.key], focus: weakest.key };
   }
   if (best.key === weakest.key || best.state === weakest.state) {
     return {
       headline: best.state === 'thriving' ? 'Thriving across the board' : 'Steady across the board',
-      line: best.state === 'thriving' ? ON_TRACK_STEP : AREA_STEPS[weakest.key],
+      line: best.state === 'thriving' ? ON_TRACK_STEP : (weakest.step ?? AREA_STEPS[weakest.key]),
       focus: best.state === 'thriving' ? null : weakest.key,
     };
   }
   return {
     headline: `Strong ${NOUN[best.key]}, steady ${NOUN[weakest.key]}`,
-    line: AREA_STEPS[weakest.key],
+    line: weakest.step ?? AREA_STEPS[weakest.key],
     focus: weakest.key,
   };
 }
@@ -561,6 +607,8 @@ export type VitalRow = {
   day: string | null;
   /** Entered by the user (e.g. a corrected night), not read from a source. */
   manual?: boolean;
+  /** Read from a lab report. */
+  fromReport?: boolean;
 };
 
 /** A measured-only metric with no reading yet: shown as an ask, never estimated. */
@@ -643,6 +691,8 @@ export function vitalsDetail(input: VitalsInput, report: VitalsReport): VitalsDe
     });
   }
 
+  const reportDay = (day: string, field: NumKey) =>
+    !!input.days.find((d) => d.day === day)?.fromReport?.includes(field);
   const reading = (
     key: MetricKey,
     area: AreaKey,
@@ -662,6 +712,7 @@ export function vitalsDetail(input: VitalsInput, report: VitalsReport): VitalsDe
       source: 'measured',
       band: bandFor(baselineValues(input, field, r.day), typical),
       day: r.day,
+      fromReport: reportDay(r.day, field),
     });
     return true;
   };
@@ -688,6 +739,7 @@ export function vitalsDetail(input: VitalsInput, report: VitalsReport): VitalsDe
       source: 'measured',
       band: bandFor(baselineValues(input, 'systolic', sys.day), [90, 120]),
       day: sys.day,
+      fromReport: reportDay(sys.day, 'systolic'),
     });
   } else {
     stubs.push({ key: 'blood_pressure', area: 'heart', action: 'add' });

@@ -6,24 +6,29 @@ import { formatLabNumber, parseValue, type RangeState } from '@/shared';
 import { useHaloTheme } from '@/theme/theme-provider';
 
 /**
- * One value from a report, for any analyte: its name, the number (tap to fix it), and where it
- * sits against the range in words. Rows without `onEdit` (all results) are read-only.
+ * One value from a report, for any analyte: its name, the number (tap to fix it), and one short
+ * line: where it sits ("In range", tinted), the expected values ("13–17") and the previous
+ * report's value ("was 12.6 in Mar"). Rows without `onEdit` (all results) are read-only.
  */
 export function ReviewRow({
   label,
   value,
   qualifier,
   unit,
-  words,
   state,
+  stateWord,
+  expected,
+  trend,
   onEdit,
 }: {
   label: string;
   value: number;
   qualifier: '<' | '>' | null;
   unit: string | null;
-  words: string | null;
   state: RangeState | null;
+  stateWord: string | null;
+  expected: string | null;
+  trend?: string | null;
   onEdit?: (value: number) => void;
 }) {
   const { theme } = useHaloTheme();
@@ -37,6 +42,8 @@ export function ReviewRow({
         ? theme.colors.opportunity
         : theme.colors.muted;
 
+  const rest = [expected, trend].filter(Boolean).join(' · ');
+
   const commit = () => {
     setEditing(false);
     const parsed = parseValue(draft);
@@ -47,9 +54,11 @@ export function ReviewRow({
     <View className="flex-row items-start rounded-[20px] bg-glass/5 px-4 py-3">
       <View className="flex-1 pr-3">
         <Text className="font-sans text-[16px] text-text">{label}</Text>
-        {words ? (
-          <Text className="mt-0.5 font-sans text-[14px]" style={{ color: tint }}>
-            {words}
+        {stateWord || expected || trend ? (
+          <Text className="mt-0.5 font-sans text-[14px] text-muted">
+            {stateWord ? <Text style={{ color: tint }}>{stateWord}</Text> : null}
+            {stateWord && rest ? ' · ' : ''}
+            {rest}
           </Text>
         ) : null}
       </View>

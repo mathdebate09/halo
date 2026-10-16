@@ -15,7 +15,7 @@ import { reports, vitalsReadings } from '@/db/schema';
 import { useProfile } from '@/lib/plan';
 import { fixReading, removeReport } from '@/reports/confirm';
 import { ReviewRow } from '@/reports/review-row';
-import { dayStart, rangeFor, rangeWords } from '@/shared';
+import { dayStart, rangeFor, rangeShort, rangeWords, STATE_WORDS } from '@/shared';
 import { useHaloTheme } from '@/theme/theme-provider';
 
 // One report's values as they went into Vitals (it's added as soon as it's read, no check step).
@@ -93,21 +93,22 @@ export default function ReportScreen() {
           {data
             .map((r) => {
               const range = rangeFor({ metric: r.metric, refLo: r.refLo, refHi: r.refHi }, sex);
-              const words = rangeWords(r.value, r.qualifier, range, r.unit || null);
+              const state = rangeWords(r.value, r.qualifier, range, r.unit || null)?.state ?? null;
               // Outside the range first, as everywhere else.
-              if (!places.current.has(r.id)) places.current.set(r.id, outside(words?.state));
-              return { r, words, place: places.current.get(r.id)! };
+              if (!places.current.has(r.id)) places.current.set(r.id, outside(state));
+              return { r, range, state, place: places.current.get(r.id)! };
             })
             .sort((a, b) => a.place - b.place)
-            .map(({ r, words }) => (
+            .map(({ r, range, state }) => (
               <ReviewRow
                 key={r.id}
                 label={r.label ?? r.metric}
                 value={r.value}
                 qualifier={r.qualifier}
                 unit={r.unit || null}
-                words={words?.words ?? null}
-                state={words?.state ?? null}
+                state={state}
+                stateWord={state ? STATE_WORDS[state] : null}
+                expected={rangeShort(range)}
                 onEdit={(value) => fixReading(r.id, value)}
               />
             ))}

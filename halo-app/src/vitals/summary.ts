@@ -77,5 +77,17 @@ export function areaSummary(
       if (perWeek < 0.15) return 'Holding steady.';
       return `${trend < 0 ? 'Down' : 'Up'} ${round(perWeek, 1)} ${unit} a week.`;
     }
+    case 'blood': {
+      // The familiar factors, named when outside their range: "Haemoglobin outside its range."
+      const factors = (input.blood ?? []).filter((f) => f.lead.state);
+      const outside = factors.filter((f) => f.lead.state !== 'inside').map((f) => f.label);
+      if (outside.length === 0) return `All ${factors.length} in range.`;
+      const later = (n: string) => n.charAt(0).toLowerCase() + n.slice(1);
+      const names =
+        outside.length === 1
+          ? outside[0]!
+          : `${[outside[0]!, ...outside.slice(1, -1).map(later)].join(', ')} and ${later(outside.at(-1)!)}`;
+      return `${names} outside ${outside.length === 1 ? 'its range' : 'their ranges'}.`;
+    }
   }
 }

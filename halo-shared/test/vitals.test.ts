@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { labResults, surfaceFactors } from '../src/blood-work';
 import { addDays } from '../src/day';
 import { BANNED } from '../src/phrase';
 import { type ScreenEvent, screenDays } from '../src/sleep';
@@ -330,5 +331,74 @@ describe('screenDays', () => {
       ev(at('2026-10-16', 0, 30), false),
     ]);
     expect(result).toEqual([{ day: d2, onMin: 120, lateMin: 60 }]);
+  });
+});
+
+describe('blood work area', () => {
+  // A report's familiar factors, as the app builds them from its readings.
+  const blood = (rs: { metric: string; value: number; refLo?: number; refHi?: number; day?: string }[]) =>
+    surfaceFactors(
+      labResults(
+        rs.map((r, i) => ({
+          id: `b${i}`,
+          metric: r.metric,
+          label: null,
+          value: r.value,
+          unit: 'mg/dL',
+          qualifier: null,
+          refLo: r.refLo ?? null,
+          refHi: r.refHi ?? null,
+          day: r.day ?? TODAY,
+          reportId: 'rep',
+        })),
+      ),
+    );
+
+  it('has no area without a report: never estimated', () => {
+    expect(areaOf('blood', [])).toBeUndefined();
+    expect(areaOf('blood', [], { blood: [] })).toBeUndefined();
+  });
+
+  it('scores in range well, outside lower, far outside lowest, as measured', () => {
+    const inside = areaOf('blood', [], { blood: blood([{ metric: 'ldl', value: 94, refHi: 100 }]) })!;
+    expect(inside).toMatchObject({ score: 90, state: 'thriving', source: 'measured' });
+    const outside = areaOf('blood', [], {
+      blood: blood([
+        { metric: 'ldl', value: 94, refHi: 100 },
+        { metric: 'haemoglobin', value: 12.6, refLo: 13, refHi: 17 },
+      ]),
+    })!;
+    expect(outside.score).toBe(75);
+    const far = areaOf('blood', [], { blood: blood([{ metric: 'haemoglobin', value: 8, refLo: 13, refHi: 17 }]) })!;
+    expect(far).toMatchObject({ score: 35, state: 'needs_care' });
+  });
+
+  it('counts an older report as an estimate, and drops one over a year old', () => {
+    const old = areaOf('blood', [], { blood: blood([{ metric: 'ldl', value: 94, refHi: 100, day: addDays(TODAY, -120) }]) })!;
+    expect(old).toMatchObject({ source: 'estimated', confidence: 0.6 });
+    expect(areaOf('blood', [], { blood: blood([{ metric: 'ldl', value: 94, refHi: 100, day: addDays(TODAY, -400) }]) })).toBeUndefined();
+  });
+
+  it("leads the headline with the factor's own step when blood work needs care", () => {
+    const report = vitalsReport(
+      input(days(1, () => ({ sleepMin: 450 })), {
+        blood: blood([{ metric: 'triglycerides', value: 300, refHi: 150 }]),
+      }),
+    );
+    const words = vitalsHeadline(report.areas);
+    expect(words.focus).toBe('blood');
+    expect(words.headline).toBe('Strong sleep, with room in blood work');
+    expect(words.line).toBe('Worth showing your doctor.');
+  });
+});
+
+describe('readings from a lab report', () => {
+  it('marks the row as read from a report', () => {
+    const d = days(1, () => ({ glucoseMgDl: 96, fromReport: ['glucoseMgDl'] }));
+    const r = input(d);
+    const glucose = vitalsDetail(r, vitalsReport(r)).rows.find((x) => x.key === 'glucose')!;
+    expect(glucose).toMatchObject({ value: 96, fromReport: true });
+    const meter = input(days(1, () => ({ glucoseMgDl: 96 })));
+    expect(vitalsDetail(meter, vitalsReport(meter)).rows.find((x) => x.key === 'glucose')!.fromReport).toBe(false);
   });
 });

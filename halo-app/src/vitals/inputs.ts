@@ -9,6 +9,7 @@ import { useScreenDays, useScreenNights } from '@/assistant/screen';
 import { db } from '@/db/client';
 import { type hcDaily, vitalsReadings, weights } from '@/db/schema';
 import type { Profile } from '@/lib/plan';
+import { useLabResults } from '@/reports/lab-data';
 import {
   type ActivityGoals,
   addDays,
@@ -45,6 +46,9 @@ const METRIC_FIELDS: Record<
     field: 'glucoseMgDl',
     convert: (v, unit) => (unit === 'mmol/L' ? Math.round(v * 18) : v),
   },
+  // A report's glucose is stored in mg/dL; it counts for Heart like a meter reading.
+  glucose_fasting: { field: 'glucoseMgDl' },
+  glucose_random: { field: 'glucoseMgDl' },
   resp_rate: { field: 'respRate' },
   body_temp: { field: 'bodyTempC', convert: (v, unit) => (unit === '°F' ? ((v - 32) * 5) / 9 : v) },
   body_fat: { field: 'bodyFatPct' },
@@ -97,6 +101,8 @@ export function useVitalsInput(
     [since],
   );
   const nights = useScreenNights();
+  // Blood work reads every report, whatever its age (the area decides what still counts).
+  const { factors: blood } = useLabResults();
   const screen = useScreenDays();
   const age = ageOn(profile?.birthDate, now);
 
@@ -142,6 +148,9 @@ export function useVitalsInput(
     (row as Record<NumericField, number | null | undefined>)[target.field] = target.convert
       ? target.convert(r.value, r.unit)
       : r.value;
+    // Its row says where it came from: a lab report, not a device.
+    const others = (row.fromReport ?? []).filter((f) => f !== target.field);
+    row.fromReport = r.source === 'report' ? [...others, target.field] : others;
   }
   // Newest first: the first weigh-in seen for a day is its latest.
   const weighed = new Set<string>();
@@ -162,5 +171,6 @@ export function useVitalsInput(
       goal: profile?.goal ?? null,
       rateKgPerWeek: plan?.rateKgPerWeek ?? null,
     },
+    blood,
   };
 }

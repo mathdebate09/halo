@@ -20,10 +20,7 @@ export default function ReportsScreen() {
   const added = useAddedReports();
   // A row names its date only when it's older than the newest report (a test that one didn't have).
   const newest = results.reduce((d, r) => (r.day > d ? r.day : d), '');
-  const words = (line: string | null, day: string) => {
-    const when = day === newest ? null : `from ${shortDate(day)}`;
-    return [line, when].filter(Boolean).join(' · ') || null;
-  };
+  const older = (day: string) => (day === newest ? null : `from ${shortDate(day)}`);
 
   return (
     <ThemedScreen>
@@ -50,7 +47,9 @@ export default function ReportsScreen() {
               value={r.value}
               qualifier={r.qualifier}
               unit={r.unit}
-              words={words(r.line, r.day)}
+              stateWord={r.stateWord}
+              expected={r.expected}
+              trend={[r.trend, older(r.day)].filter(Boolean).join(' · ') || null}
               state={r.state}
             />
           ))}

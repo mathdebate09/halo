@@ -23,7 +23,7 @@ describe('labResults', () => {
       reading({ metric: 'ldl', value: 128, day: '2026-10-16', refHi: 100 }),
     ]);
     expect(ldl).toMatchObject({ value: 128, day: '2026-10-16', state: 'above', far: false });
-    expect(ldl!.line).toBe("Above the lab's limit of 100 mg/dL, down from 162 in March");
+    expect(ldl).toMatchObject({ stateWord: 'Above range', expected: 'under 100', trend: 'was 162 in Mar' });
   });
 
   it('puts results outside their range first, then by name', () => {
@@ -43,8 +43,24 @@ describe('labResults', () => {
     ]);
     const tsh = results.find((r) => r.metric === 'tsh');
     const other = results.find((r) => r.metric === 'lab:free_t4');
-    expect(tsh!.line).toBe('Within the typical range of 0.4–4.5 mIU/L');
-    expect(other).toMatchObject({ label: 'Free T4', range: null, state: null, line: null });
+    expect(tsh).toMatchObject({ stateWord: 'In range', expected: '0.4–4.5', trend: null });
+    expect(other).toMatchObject({ label: 'Free T4', range: null, state: null, stateWord: null, expected: null });
+  });
+});
+
+describe('short words', () => {
+  it('words the expected values and the trend without a sentence', async () => {
+    const { rangeShort, trendShort } = await import('../src/blood-work');
+    expect(rangeShort({ lo: 13, hi: 17 })).toBe('13–17');
+    expect(rangeShort({ lo: null, hi: 100 })).toBe('under 100');
+    expect(rangeShort({ lo: 40, hi: null })).toBe('over 40');
+    expect(rangeShort(null)).toBeNull();
+    const now = { value: 15.1, day: '2026-10-16' };
+    expect(trendShort(now, { value: 12.6, day: '2026-03-16' })).toBe('was 12.6 in Mar');
+    expect(trendShort(now, { value: 12.6, day: '2026-10-02' })).toBe('was 12.6 on 2 Oct');
+    expect(trendShort(now, { value: 12.6, day: '2025-03-16' })).toBe('was 12.6 in Mar 2025');
+    expect(trendShort(now, { value: 15.1, day: '2026-03-16' })).toBe('same as in Mar');
+    expect(trendShort(now, null)).toBeNull();
   });
 });
 

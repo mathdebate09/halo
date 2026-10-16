@@ -97,6 +97,17 @@ export default function VitalsScreen() {
             const rows = detail.rows.filter((r) => r.area === key);
             const missing = detail.stubs.some((st) => st.area === key);
             // Screen time without the module (an older build) has nothing to offer.
+            // Blood work has its own section: an area card when a report counts, its familiar
+            // factors, or one row to add a report.
+            if (key === 'blood') {
+              return (
+                <BloodWorkSection
+                  key={key}
+                  area={area}
+                  summary={area ? areaSummary(area, rows, vitalsInput, pounds) : ''}
+                />
+              );
+            }
             if (key === 'screen' && !area && usage === 'unavailable') return null;
             if (!area && rows.length === 0 && !missing) return null;
             const empty = emptyKind(key, area, hc, usage);
@@ -151,7 +162,6 @@ export default function VitalsScreen() {
               </View>
             );
           })}
-          <BloodWorkSection />
         </View>
       </ScrollView>
       <ReportCard />

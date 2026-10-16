@@ -4,7 +4,14 @@
 import { useEffect } from 'react';
 import { useMMKVString } from 'react-native-mmkv';
 
-import { ExerciseIcon, HeartIcon, MoonIcon, PhoneIcon, ScaleIcon } from '@/components/icons';
+import {
+  ExerciseIcon,
+  HeartIcon,
+  MoonIcon,
+  PhoneIcon,
+  ReportIcon,
+  ScaleIcon,
+} from '@/components/icons';
 import { kv } from '@/lib/kv';
 import { type Area, type AreaKey, type AreaState, pickBands } from '@/shared';
 import type { ThemeColors } from '@/theme/themes';
@@ -15,6 +22,7 @@ export const AREA_ICONS: Record<AreaKey, typeof MoonIcon> = {
   movement: ExerciseIcon,
   screen: PhoneIcon,
   body: ScaleIcon,
+  blood: ReportIcon,
 };
 
 /** The theme's tint for a state: Thriving = strength, Steady = steady, Needs care = opportunity. */

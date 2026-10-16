@@ -11,13 +11,12 @@ import type { Sex } from './plan.js';
 import {
   ANALYTES,
   type AnalyteKey,
+  formatLabNumber,
   isAnalyteKey,
-  labLine,
   rangeFor,
   type RangeState,
   rangeWords,
   type ShownRange,
-  trendWords,
 } from './reports.js';
 
 /** A confirmed report reading, as the app stores it (`day` = YYYY-MM-DD of the test). */
@@ -45,8 +44,12 @@ export type LabResult = {
   reportId: string | null;
   range: ShownRange | null;
   state: RangeState | null;
-  /** Range words then the trend: "Above the lab's limit of 100 mg/dL, down from 162 in March". */
-  line: string | null;
+  /** "In range", "Below range", "Above range"; null without a range to compare with. */
+  stateWord: string | null;
+  /** The expected values, short: "13–17", "under 100", "over 40". */
+  expected: string | null;
+  /** The previous report's value, short: "was 162 in Mar". */
+  trend: string | null;
   /** Well past its range (or, for thyroid, outside it at all): a doctor, not a habit. */
   far: boolean;
   previous: { value: number; day: string } | null;
@@ -60,6 +63,38 @@ function isFar(value: number, range: ShownRange | null, state: RangeState | null
   if (state === 'above' && range.hi != null) return value > range.hi * (1 + FAR);
   if (state === 'below' && range.lo != null) return value < range.lo * (1 - FAR);
   return false;
+}
+
+export const STATE_WORDS: Record<RangeState, string> = {
+  inside: 'In range',
+  below: 'Below range',
+  above: 'Above range',
+};
+
+/** The expected values without a sentence: "13–17", "under 100", "over 40". */
+export function rangeShort(range: Pick<ShownRange, 'lo' | 'hi'> | null): string | null {
+  if (!range) return null;
+  const n = formatLabNumber;
+  if (range.lo != null && range.hi != null) return `${n(range.lo)}–${n(range.hi)}`;
+  if (range.hi != null) return `under ${n(range.hi)}`;
+  if (range.lo != null) return `over ${n(range.lo)}`;
+  return null;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "was 162 in Mar", "was 162 on 3 Oct" (same month), "was 162 in Mar 2025"; the same → "same as in Mar". */
+export function trendShort(
+  current: { value: number; day: string },
+  previous: { value: number; day: string } | null,
+): string | null {
+  if (!previous) return null;
+  const [y, m, d] = previous.day.split('-').map(Number) as [number, number, number];
+  const [ny, nm] = current.day.split('-').map(Number) as [number, number];
+  const month = MONTHS[m - 1]!;
+  const when = y === ny && m === nm ? `on ${d} ${month}` : y === ny ? `in ${month}` : `in ${month} ${y}`;
+  const same = Math.abs(current.value - previous.value) <= Math.abs(previous.value) * 0.01;
+  return same ? `same as ${when}` : `was ${formatLabNumber(previous.value)} ${when}`;
 }
 
 const outsideFirst = (a: LabResult, b: LabResult) =>
@@ -89,13 +124,9 @@ export function labResults(readings: readonly LabReading[], sex?: Sex | null): L
       reportId: latest.reportId,
       range,
       state,
-      line: labLine(
-        words?.words ?? null,
-        trendWords(
-          { value: latest.value, date: latest.day },
-          previous && { value: previous.value, date: previous.day },
-        ),
-      ),
+      stateWord: state ? STATE_WORDS[state] : null,
+      expected: rangeShort(range),
+      trend: trendShort({ value: latest.value, day: latest.day }, previous),
       far: isFar(latest.value, range, state),
       previous,
     });

@@ -27,11 +27,13 @@ export const METRIC_LABELS: Record<RowKey, string> = {
   screen_daily: 'Screen time a day',
   weight_trend: 'Weight',
   body_fat: 'Body fat',
+  blood_work: 'Blood work',
 };
 
 /** Where a row's number came from, in words the user knows. */
 export function sourceText(row: VitalRow): string {
   if (row.manual) return 'Your entry';
+  if (row.fromReport) return 'Lab report';
   if (row.key === 'sleep') {
     return row.source === 'estimated' ? 'Estimated from phone use' : 'Health Connect';
   }
