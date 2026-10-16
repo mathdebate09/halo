@@ -11,6 +11,7 @@ import {
   parsePressure,
   parseRange,
   parseValue,
+  printedView,
   rangeFor,
   rangeWords,
   recogniseAnalyte,
@@ -341,9 +342,13 @@ describe('mergeReport', () => {
       page([
         entry({ name: 'Haemoglobin', rawName: 'Hämoglobin', value: 14, unit: 'g/dL' }),
         entry({ name: 'Ferritin', rawName: 'Ferritin', value: 96, unit: 'ng/mL' }),
+        entry({ name: 'Haemoglobin', rawName: 'Hemoglobin', value: 15, unit: 'g/dL', date: '2026-01-01' }),
+        entry({ name: 'ALT', rawName: 'SGPT', value: 26, unit: 'U/L' }),
+        entry({ name: 'Blood Urea Nitrogen', rawName: 'Blood Urea Nitrogen (BUN)', value: 14, unit: 'mg/dL' }),
+        entry({ name: 'RBC count', rawName: 'RBC Count', value: 5, unit: 'x10^6/uL' }),
       ]),
     ]);
-    expect(values.map((v) => v.rawName)).toEqual(['Hämoglobin', null]);
+    expect(values.map((v) => v.rawName)).toEqual(['Hämoglobin', null, null, null, null, null]);
   });
 
   it("reads the user's sex from a two-sex range", () => {
@@ -382,6 +387,19 @@ describe('words', () => {
     expect(rangeFor({ metric: 'ldl', refLo: null, refHi: null })).toEqual({ lo: null, hi: 100, source: 'typical' });
     expect(rangeFor({ metric: 'hdl', refLo: null, refHi: null }, 'female')).toEqual({ lo: 50, hi: null, source: 'typical' });
     expect(rangeFor({ metric: 'lab:egfr', refLo: null, refHi: null })).toBeNull();
+  });
+
+  it('shows a value as printed, with its range and words in the printed unit', () => {
+    const { values } = mergeReport([page([entry({ name: 'LDL', value: 2.6, unit: 'mmol/L', refText: '< 3.0' })])]);
+    const view = printedView(values[0]!);
+    expect(view.unit).toBe('mmol/L');
+    expect(view.value).toBeCloseTo(2.6, 4);
+    expect(view.range!.hi).toBeCloseTo(3, 4);
+    expect(view.words).toEqual({ state: 'inside', words: "Under the lab's limit of 3\u00A0mmol/L" });
+    // No printed range: the typical one, converted too.
+    const typical = printedView({ ...values[0]!, refHi: null });
+    expect(typical.range!.hi).toBeCloseTo(2.59, 2);
+    expect(typical.words!.state).toBe('above');
   });
 
   it('says when, relative to the newer reading', () => {

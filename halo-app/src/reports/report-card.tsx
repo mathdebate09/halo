@@ -1,6 +1,6 @@
 import { and, desc, inArray, isNull } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { useIsFocused } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import Animated, {
@@ -104,34 +104,40 @@ export function ReportCard() {
         right: 16,
         bottom: insets.bottom + 12 + DOCK_HEIGHT + 12,
       }}>
-      <View
-        accessible
-        accessibilityLabel={`${title}. ${line}${more > 0 ? `, and ${more} more` : ''}`}
-        className="flex-row items-center rounded-pill border border-hairline/10 bg-surface p-2 pr-3">
-        <View className="h-11 w-11 items-center justify-center rounded-full bg-glass/10">
-          <ReportIcon size={20} color={theme.colors.text} />
-        </View>
-        <View className="ml-3 flex-1">
-          <LayoutAnimationConfig skipEntering>
-            <Animated.View key={`${first.id}-${first.status}`} entering={FadeIn.duration(400)}>
-              <Text numberOfLines={1} className="font-sans-medium text-[15px] text-text">
-                {title}
-              </Text>
-              <Text numberOfLines={1} className="font-sans text-[13px] text-muted">
-                {line}
-              </Text>
-            </Animated.View>
-          </LayoutAnimationConfig>
-          {first.status === 'analysing' ? (
-            <ProgressLine
-              fraction={progress.total ? progress.done / progress.total : 0}
-              color={theme.colors.accent}
-            />
+      <View className="flex-row items-center rounded-pill border border-hairline/10 bg-surface p-2 pr-3">
+        {/* A report ready to check opens the confirm step; the actions stay their own buttons. */}
+        <PressScale
+          accessibilityRole={first.status === 'review' ? 'button' : 'text'}
+          accessibilityLabel={`${title}. ${line}${more > 0 ? `, and ${more} more` : ''}`}
+          disabled={first.status !== 'review'}
+          onPress={() => router.push({ pathname: '/report/[id]', params: { id: first.id } })}
+          pressableStyle={{ flex: 1 }}
+          className="flex-row items-center">
+          <View className="h-11 w-11 items-center justify-center rounded-full bg-glass/10">
+            <ReportIcon size={20} color={theme.colors.text} />
+          </View>
+          <View className="ml-3 flex-1">
+            <LayoutAnimationConfig skipEntering>
+              <Animated.View key={`${first.id}-${first.status}`} entering={FadeIn.duration(400)}>
+                <Text numberOfLines={1} className="font-sans-medium text-[15px] text-text">
+                  {title}
+                </Text>
+                <Text numberOfLines={1} className="font-sans text-[13px] text-muted">
+                  {line}
+                </Text>
+              </Animated.View>
+            </LayoutAnimationConfig>
+            {first.status === 'analysing' ? (
+              <ProgressLine
+                fraction={progress.total ? progress.done / progress.total : 0}
+                color={theme.colors.accent}
+              />
+            ) : null}
+          </View>
+          {more > 0 ? (
+            <Text className="mr-2 font-sans-medium text-[13px] text-muted">+{more}</Text>
           ) : null}
-        </View>
-        {more > 0 ? (
-          <Text className="mr-2 font-sans-medium text-[13px] text-muted">+{more}</Text>
-        ) : null}
+        </PressScale>
         {/* The actions change with the state, so they cross in with the words. */}
         <LayoutAnimationConfig skipEntering>
           <Animated.View

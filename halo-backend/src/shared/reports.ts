@@ -556,6 +556,8 @@ export type ReportValue = {
   refText: string | null;
   /** The value and unit exactly as printed. */
   raw: string;
+  /** The unit as printed (`unit` is the canonical one for recognised analytes). */
+  printedUnit: string | null;
   flag: 'H' | 'L' | null;
   /** YYYY-MM-DD, or null when the report has no date anywhere (the confirm step asks). */
   date: string | null;
@@ -588,6 +590,23 @@ export function labLabel(metric: string, label: string): string {
   return isAnalyteKey(metric) ? ANALYTES[metric].label : label;
 }
 
+/**
+ * Whether the name as printed tells the user something the label doesn't: not when it's the same
+ * name with a "(…)" or different case, nor another spelling of the same recognised test
+ * ("Hemoglobin" for Haemoglobin, "SGPT" for ALT). Another language, yes.
+ */
+function printedNameWorthShowing(
+  raw: string | null,
+  label: string,
+  key: AnalyteKey | null,
+  unit: string | null,
+): boolean {
+  if (!raw) return false;
+  const bare = (n: string) => nameKey(n.replace(/\([^)]*\)/g, ' '));
+  if (bare(raw) === bare(label) || nameKey(raw) === nameKey(label)) return false;
+  return !(key && recogniseAnalyte([raw], unit) === key);
+}
+
 function normalise(e: ReportEntry, date: string | null, sex: Sex | null | undefined): ReportValue {
   const key = recogniseAnalyte([e.rawName, e.name], e.unit, e.key);
   const range = parseRange(e.refText, sex);
@@ -601,7 +620,7 @@ function normalise(e: ReportEntry, date: string | null, sex: Sex | null | undefi
     id: `${metric}|${date ?? ''}|${shown(value)}`,
     metric,
     label,
-    rawName: e.rawName && nameKey(e.rawName) !== nameKey(label) ? e.rawName : null,
+    rawName: printedNameWorthShowing(e.rawName, label, key, e.unit) ? e.rawName : null,
     value: shown(value)!,
     unit: key ? ANALYTES[key].unit : e.unit,
     qualifier: e.qualifier,
@@ -609,6 +628,7 @@ function normalise(e: ReportEntry, date: string | null, sex: Sex | null | undefi
     refHi: shown(convert(range?.hi ?? null)),
     refText: e.refText,
     raw,
+    printedUnit: e.unit,
     flag: e.flag,
     date,
     confidence: e.confidence,
@@ -757,6 +777,23 @@ export function trendWords(
   const same = Math.abs(current.value - previous.value) <= Math.abs(previous.value) * 0.01;
   if (same) return `the same as ${when}`;
   return `${current.value > previous.value ? 'up' : 'down'} from ${formatLabNumber(previous.value)} ${when}`;
+}
+
+/**
+ * A value as the report printed it, for checking against the paper: the number, the unit and the
+ * range in the printed unit, with the range words in it.
+ */
+export function printedView(
+  v: Pick<ReportValue, 'metric' | 'value' | 'unit' | 'printedUnit' | 'qualifier' | 'refLo' | 'refHi'>,
+  sex?: Sex | null,
+): { value: number; unit: string | null; range: ShownRange | null; words: ReturnType<typeof rangeWords> } {
+  const key = isAnalyteKey(v.metric) ? v.metric : null;
+  const unit = v.printedUnit ?? v.unit;
+  const back = (x: number | null) => (x == null || !key ? x : fromCanonical(key, x, unit));
+  const value = back(v.value) ?? v.value;
+  const canonical = rangeFor(v, sex);
+  const range = canonical ? { ...canonical, lo: back(canonical.lo), hi: back(canonical.hi) } : null;
+  return { value, unit, range, words: rangeWords(value, v.qualifier, range, unit) };
 }
 
 /** The row's one line: range words, then the trend ("Above the lab's limit of 100 mg/dL, down from 162 in March"). */
