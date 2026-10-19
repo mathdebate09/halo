@@ -32,6 +32,15 @@ object OverlayStore {
   }
   fun setPosition(c: Context, x: Int, y: Int) = prefs(c).edit().putInt("x", x).putInt("y", y).apply()
 
+  /** Flags acted on from the overlay: they stop blinking and peeking before Halo has caught up. */
+  fun handled(c: Context): Set<String> =
+    prefs(c).getString("handled", "")!!.split(',').filter { it.isNotEmpty() }.toSet()
+
+  fun addHandled(c: Context, id: String) {
+    val list = (prefs(c).getString("handled", "")!!.split(',').filter { it.isNotEmpty() && it != id } + id).takeLast(30)
+    prefs(c).edit().putString("handled", list.joinToString(",")).apply()
+  }
+
   /** Adds one entry for the app to pick up (written at once: the process may die right after). */
   @Synchronized
   fun enqueue(c: Context, item: JSONObject) {

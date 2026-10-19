@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.graphics.Outline
 import android.graphics.Paint
@@ -19,7 +20,6 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewOutlineProvider
-import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -66,8 +66,8 @@ private fun withAlpha(color: Int, alpha: Float) =
 
 /**
  * The collapsed bubble: a glass disc, the halo ring and the overall score. When the PA needs
- * something (a meal, water, a reading), a dot shows and the score slowly trades places with that
- * thing's icon; otherwise it stays still.
+ * something (a meal, water, a reading), a dot shows and the icon of that thing blinks in place of
+ * the score every few seconds, like a notification light; otherwise it stays still.
  */
 @SuppressLint("ViewConstructor")
 class BubbleView(context: Context) : View(context) {
@@ -76,46 +76,71 @@ class BubbleView(context: Context) : View(context) {
 
   /** 0 = the score, 1 = the icon. */
   private var phase = 0f
-  private var cycling = false
+  private var blinking = false
   private var fade: ValueAnimator? = null
-  private val swap = Runnable { toggle() }
+  private val steps = mutableListOf<Runnable>()
+  private val blink = Runnable { blinkOnce() }
   private val icon = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     style = Paint.Style.STROKE
     strokeCap = Paint.Cap.ROUND
     strokeJoin = Paint.Join.ROUND
   }
 
-  /** Alternates while a flag with an icon is live and the ring is showing; else rests on the score. */
-  fun setCycling(on: Boolean) {
-    if (on == cycling) return
-    cycling = on
-    removeCallbacks(swap)
+  /** Blinks while a flag with an icon needs the user and the ring is showing; else rests on the score. */
+  fun setBlinking(on: Boolean) {
+    if (on == blinking) return
+    blinking = on
+    stopBlink()
+    if (on) postDelayed(blink, FIRST_BLINK_MS)
+  }
+
+  private fun stopBlink() {
+    removeCallbacks(blink)
+    steps.forEach { removeCallbacks(it) }
+    steps.clear()
     fade?.cancel()
     fade = null
     phase = 0f
     invalidate()
-    if (on) postDelayed(swap, HOLD_MS)
   }
 
-  private fun toggle() {
-    val to = if (phase < 0.5f) 1f else 0f
+  private fun fadeTo(to: Float) {
+    fade?.cancel()
     fade = ValueAnimator.ofFloat(phase, to).apply {
-      duration = FADE_MS
-      interpolator = AccelerateDecelerateInterpolator()
+      duration = SNAP_MS
       addUpdateListener {
         phase = it.animatedValue as Float
         invalidate()
       }
       start()
     }
-    postDelayed(swap, FADE_MS + HOLD_MS)
+  }
+
+  /** On, off, on, off (a double blink), then rest until the next one. */
+  private fun blinkOnce() {
+    steps.clear()
+    var at = 0L
+    for ((to, hold) in BLINK) {
+      val step = Runnable { fadeTo(to) }
+      steps.add(step)
+      postDelayed(step, at)
+      at += SNAP_MS + hold
+    }
+    postDelayed(blink, EVERY_MS)
+  }
+
+  /** A short sideways wiggle (a turn and back), when a flag starts and every so often while it's open. */
+  fun wiggle() {
+    animate().cancel()
+    ObjectAnimator.ofFloat(this, "rotation", 0f, -10f, 9f, -6f, 4f, 0f).apply {
+      duration = 420
+      start()
+    }
   }
 
   override fun onDetachedFromWindow() {
-    cycling = false
-    removeCallbacks(swap)
-    fade?.cancel()
-    fade = null
+    blinking = false
+    stopBlink()
     super.onDetachedFromWindow()
   }
 
@@ -150,19 +175,19 @@ class BubbleView(context: Context) : View(context) {
     ring.strokeWidth = context.dp(1.5f)
     oval.set(cx - r + context.dp(5f), cy - r * 0.62f, cx + r - context.dp(5f), cy + r * 0.62f)
     canvas.drawOval(oval, ring)
-    // The score and the icon cross-fade, each easing a little in scale as it comes and goes.
+    // The score and the icon trade places with a quick fade (a blink, not a drift).
     val path = flag?.icon?.let { Icons.path(it) }
     val showIcon = if (path == null) 0f else phase
     if (showIcon < 1f) {
       number.color = withAlpha(c.text, 1f - showIcon)
       number.typeface = Fonts.serif(context)
-      number.textSize = context.dp(24f) * (1f - 0.08f * showIcon)
+      number.textSize = context.dp(24f)
       val baseline = cy - (number.descent() + number.ascent()) / 2
       canvas.drawText(s.overall.toString(), cx, baseline, number)
     }
     if (path != null && showIcon > 0f) {
       val f = flag!!
-      val size = context.dp(26f) * (0.92f + 0.08f * showIcon)
+      val size = context.dp(26f)
       icon.color = withAlpha(if (f.critical) c.alert else c.text, showIcon)
       icon.strokeWidth = 1.5f
       canvas.save()
@@ -186,8 +211,11 @@ class BubbleView(context: Context) : View(context) {
   }
 
   private companion object {
-    const val HOLD_MS = 2200L
-    const val FADE_MS = 700L
+    const val FIRST_BLINK_MS = 1200L
+    const val EVERY_MS = 5000L
+    const val SNAP_MS = 120L
+    /** Each step: show the icon (1) or the score (0), then hold this long. */
+    val BLINK = listOf(1f to 450L, 0f to 180L, 1f to 450L, 0f to 0L)
   }
 }
 
@@ -221,6 +249,45 @@ class CloseTarget(context: Context) : View(context) {
   }
 }
 
+/**
+ * The pill that slides out from behind the ring toward the middle of the screen when the PA needs
+ * something ("Dinner time"); a tap opens the card. Its inner end tucks under the ring.
+ */
+@SuppressLint("ViewConstructor")
+class PillView(context: Context) : FrameLayout(context) {
+  val label = TextView(context).apply {
+    typeface = Fonts.medium(context)
+    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+    maxLines = 1
+    ellipsize = android.text.TextUtils.TruncateAt.END
+    gravity = Gravity.CENTER_VERTICAL
+    maxWidth = context.dpi(230f)
+    elevation = context.dp(4f)
+    isClickable = true
+  }
+
+  init {
+    clipChildren = false
+    setPadding(context.dpi(4f), 0, context.dpi(4f), 0)
+    addView(label, LayoutParams(LayoutParams.WRAP_CONTENT, context.dpi(44f), Gravity.CENTER_VERTICAL))
+    visibility = INVISIBLE
+  }
+
+  fun bind(flag: Flag, c: Palette, ringOnRight: Boolean, ringSize: Int) {
+    label.text = flag.title
+    label.contentDescription = "${flag.title}. Opens Halo's card."
+    label.setTextColor(if (flag.critical) c.alert else c.text)
+    val inner = ringSize / 2 + context.dpi(10f)
+    val outer = context.dpi(16f)
+    if (ringOnRight) label.setPadding(outer, 0, inner, 0) else label.setPadding(inner, 0, outer, 0)
+    label.background = GradientDrawable().apply {
+      cornerRadius = context.dp(999f)
+      setColor(withAlpha(c.surface, 0.97f))
+      setStroke(context.dpi(1f), withAlpha(c.text, 0.12f))
+    }
+  }
+}
+
 /** What the card can do; the service carries each out. */
 interface CardActions {
   fun onFlag(flag: Flag)
@@ -235,6 +302,8 @@ class CardView(context: Context, private val snapshot: Snapshot, private val fla
   FrameLayout(context) {
 
   private val c = snapshot.colors
+  /** The card itself (it eases in over the dim). */
+  lateinit var body: View
 
   private fun text(size: Float, color: Int, font: Typeface, value: String) = TextView(context).apply {
     setTextSize(TypedValue.COMPLEX_UNIT_SP, size)
@@ -260,7 +329,11 @@ class CardView(context: Context, private val snapshot: Snapshot, private val fla
   ).apply { topMargin = context.dpi(top) }
 
   init {
+    // The overlay's own full-screen layer: a soft dim over the other app; a tap on it closes.
+    setBackgroundColor(Color.argb(92, 0, 0, 0))
+    setOnClickListener { actions.onDismiss() }
     val body = LinearLayout(context).apply {
+      isClickable = true
       orientation = LinearLayout.VERTICAL
       setPadding(context.dpi(20f), context.dpi(18f), context.dpi(20f), context.dpi(18f))
       background = GradientDrawable().apply {
@@ -345,11 +418,11 @@ class CardView(context: Context, private val snapshot: Snapshot, private val fla
     row.addView(send)
     body.addView(row, lp(14f))
 
-    addView(body, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+    addView(body, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, Gravity.TOP).apply {
       val m = context.dpi(12f)
-      setMargins(m, m, m, m)
+      setMargins(m, context.dpi(52f), m, m)
     })
-    isFocusableInTouchMode = true
+    this.body = body
   }
 
   override fun dispatchKeyEvent(event: KeyEvent): Boolean {

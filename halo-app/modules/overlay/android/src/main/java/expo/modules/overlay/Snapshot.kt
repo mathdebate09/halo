@@ -36,9 +36,9 @@ class Snapshot(
   /** Where Open app goes (the logger, for a photo or the mic). */
   val openUrl: String,
 ) {
-  /** The flag to show now: a critical reading first, else the one that started last. */
-  fun flagAt(now: Long): Flag? {
-    val live = flags.filter { it.at <= now && now < it.expiresAt }
+  /** The flag to show now: a critical reading first, else the one that started last. `done` = acted on here. */
+  fun flagAt(now: Long, done: Set<String> = emptySet()): Flag? {
+    val live = flags.filter { it.at <= now && now < it.expiresAt && it.id !in done }
     return live.firstOrNull { it.critical } ?: live.maxByOrNull { it.at }
   }
 
