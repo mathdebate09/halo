@@ -51,7 +51,8 @@ class OverlayService : Service() {
   private var pillParams: WindowManager.LayoutParams? = null
   /**
    * The pill stays out while a flag needs the user. A tap on the ring (or opening the card) puts it
-   * away for that flag; it comes back after a while if they still haven't acted.
+   * away for that flag; it comes back after a while if they still haven't acted, or as soon as they
+   * leave Halo without having dealt with it.
    */
   private var dismissedFlagId: String? = null
   private var dismissedAt = 0L
@@ -437,11 +438,19 @@ class OverlayService : Service() {
 
   private fun render() {
     if (destroyed) return
+    // The permission was taken back in Settings: nothing to draw, so no service and no notification.
+    if (!Settings.canDrawOverlays(this)) {
+      stopSelf()
+      return
+    }
     main.removeCallbacks(tick)
     val view = bubble ?: return
     val params = bubbleParams ?: return
     val s = Snapshot.parse(OverlayStore.snapshot(this))
-    val hidden = haloOnScreen() || s == null
+    val inHalo = haloOnScreen()
+    // Opening Halo clears a pill they put away: if the flag still needs them on the way out, it's back.
+    if (inHalo) dismissedFlagId = null
+    val hidden = inHalo || s == null
     if (hidden) {
       collapse()
       tuckPill(instant = true)
