@@ -19,3 +19,4 @@ export * from './sync';
 export * from './tips';
 export * from './units';
 export * from './vitals';
+export * from './voice';

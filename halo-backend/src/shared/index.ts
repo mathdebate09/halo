@@ -21,3 +21,4 @@ export * from './sync.js';
 export * from './tips.js';
 export * from './units.js';
 export * from './vitals.js';
+export * from './voice.js';
