@@ -92,9 +92,6 @@ declare class OverlayModule extends NativeModule<Events> {
   setSnapshot(json: string): void;
   /** What a voice turn needs (an OverlayVoice as JSON). Missing before the 27d rebuild. */
   setVoice(json: string): void;
-  /** Chunk 27a spike: the next ring tap records 4 s and plays it back. Missing before the rebuild. */
-  armVoiceSpike(mode: 'fgs' | 'activity'): void;
-  voiceSpikeResult(): string;
   /** Everything logged on the overlay since the last call (a JSON array string). */
   takeQueue(): string;
 }

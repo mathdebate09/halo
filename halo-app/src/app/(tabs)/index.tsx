@@ -1,4 +1,4 @@
-import { router, useFocusEffect, useIsFocused } from 'expo-router';
+import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, {
@@ -15,6 +15,7 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { runAction } from '@/assistant/actions';
 import { useAssistant } from '@/assistant/assistant';
 import { recordShown } from '@/assistant/loop-store';
 import { useBriefWords } from '@/assistant/phrasing';
@@ -64,6 +65,13 @@ export default function TodayScreen() {
   const hero = themes[theme.id];
   const scores = useTodayScores();
   const focused = useIsFocused();
+  // A voice reply from the ring asked for Usage access or Health Connect: Halo opens here and asks.
+  const { ask } = useLocalSearchParams<{ ask?: string }>();
+  useEffect(() => {
+    if (ask !== 'usage_access' && ask !== 'connect') return;
+    router.setParams({ ask: undefined });
+    void runAction({ kind: ask });
+  }, [ask]);
   const glow = useMealCelebration(scores, focused);
   const { brief, phrase } = useAssistant();
   const words = useBriefWords(brief, phrase);

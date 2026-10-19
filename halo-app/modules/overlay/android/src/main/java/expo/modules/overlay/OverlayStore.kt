@@ -50,17 +50,12 @@ object OverlayStore {
     prefs(c).edit().putString("handled", list.joinToString(",")).apply()
   }
 
-  /** Chunk 27a spike: the next ring tap records and plays back ("fgs" or "activity"), once. */
-  fun armVoiceSpike(c: Context, mode: String) = prefs(c).edit().putString("voiceSpike", mode).putString("voiceSpikeResult", "armed: $mode").apply()
+  /** The client ids the last voice reply logged: what "undo that" takes back. */
+  fun lastVoiceLogs(c: Context): List<String> =
+    prefs(c).getString("voiceLogs", "")!!.split(',').filter { it.isNotEmpty() }
 
-  fun takeVoiceSpike(c: Context): String? {
-    val mode = prefs(c).getString("voiceSpike", null) ?: return null
-    prefs(c).edit().remove("voiceSpike").apply()
-    return mode
-  }
-
-  fun voiceSpikeResult(c: Context) = prefs(c).getString("voiceSpikeResult", "") ?: ""
-  fun setVoiceSpikeResult(c: Context, text: String) = prefs(c).edit().putString("voiceSpikeResult", text).apply()
+  fun setLastVoiceLogs(c: Context, ids: List<String>) =
+    prefs(c).edit().putString("voiceLogs", ids.joinToString(",")).apply()
 
   /** Adds one entry for the app to pick up (written at once: the process may die right after). */
   @Synchronized

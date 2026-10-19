@@ -54,6 +54,7 @@ internal object Icons {
     "weight" to "M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18V6A1.5 1.5 0 0 1 5 4.5zM9 9.5a4.2 4.2 0 0 1 6 0M12 11l1.2-1.6",
     "activity" to "M12 21a5.5 5.5 0 0 1-5.5-5.5c0-2.6 1.6-4.2 2.9-5.6.2 1.6 1 2.6 2.1 3 0-3.4 1.2-6.3 3.4-8.4.2 2.8 1.4 4.6 2.6 6.2.9 1.2 1.5 2.6 1.5 4.3A5.5 5.5 0 0 1 12 21z",
     "report" to "M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6",
+    "mic" to "M12 3.5a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0v-5a3 3 0 0 0-3-3zM5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v3",
   )
   private val cache = mutableMapOf<String, Path>()
 
@@ -73,6 +74,13 @@ private fun withAlpha(color: Int, alpha: Float) =
 class BubbleView(context: Context) : View(context) {
   var snapshot: Snapshot? = null
   var flag: Flag? = null
+  /** Listening for a voice log: the mic in place of the score, no flag dot. */
+  var listening = false
+    set(value) {
+      if (field == value) return
+      field = value
+      invalidate()
+    }
 
   /** 0 = the score, 1 = the icon. */
   private var phase = 0f
@@ -175,6 +183,19 @@ class BubbleView(context: Context) : View(context) {
     ring.strokeWidth = context.dp(1.5f)
     oval.set(cx - r + context.dp(5f), cy - r * 0.62f, cx + r - context.dp(5f), cy + r * 0.62f)
     canvas.drawOval(oval, ring)
+    if (listening) {
+      val mic = Icons.path("mic")!!
+      val size = context.dp(26f)
+      icon.color = c.text
+      icon.strokeWidth = 1.5f
+      canvas.save()
+      canvas.translate(cx - size / 2, cy - size / 2)
+      canvas.scale(size / 24f, size / 24f)
+      canvas.drawPath(mic, icon)
+      canvas.restore()
+      contentDescription = "Halo, listening"
+      return
+    }
     // The score and the icon trade places with a quick fade (a blink, not a drift).
     val path = flag?.icon?.let { Icons.path(it) }
     val showIcon = if (path == null) 0f else phase
@@ -282,6 +303,126 @@ class PillView(context: Context) : FrameLayout(context) {
     if (ringOnRight) label.setPadding(outer, 0, inner, 0) else label.setPadding(inner, 0, outer, 0)
     label.background = GradientDrawable().apply {
       cornerRadius = context.dp(999f)
+      setColor(withAlpha(c.surface, 0.97f))
+      setStroke(context.dpi(1f), withAlpha(c.text, 0.12f))
+    }
+  }
+}
+
+/**
+ * Three dots that move like a slow wave while the ring listens (a little higher when the voice is
+ * louder), and breathe more slowly while the reply is on its way.
+ */
+class DotsView(context: Context) : View(context) {
+  var color = Color.WHITE
+  /** 0..1, the voice's level. */
+  var level = 0f
+  var thinking = false
+  private var phase = 0f
+  private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+  private val wave = ValueAnimator.ofFloat(0f, (2 * Math.PI).toFloat()).apply {
+    duration = 1400
+    repeatCount = ValueAnimator.INFINITE
+    interpolator = android.view.animation.LinearInterpolator()
+    addUpdateListener {
+      phase = it.animatedValue as Float
+      invalidate()
+    }
+  }
+
+  override fun onAttachedToWindow() {
+    super.onAttachedToWindow()
+    wave.start()
+  }
+
+  override fun onDetachedFromWindow() {
+    wave.cancel()
+    super.onDetachedFromWindow()
+  }
+
+  override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) =
+    setMeasuredDimension(context.dpi(36f), context.dpi(20f))
+
+  override fun onDraw(canvas: Canvas) {
+    val r = context.dp(3f)
+    val gap = context.dp(11f)
+    val cy = height / 2f
+    for (i in 0 until 3) {
+      val cx = width / 2f + (i - 1) * gap
+      val t = if (thinking) phase / 1.6f else phase
+      val wave = kotlin.math.sin(t - i * 0.9f)
+      val y = if (thinking) 0f else -wave * (context.dp(2f) + level * context.dp(4f))
+      paint.color = withAlpha(color, if (thinking) 0.45f + 0.35f * (wave + 1) / 2 else 0.9f)
+      canvas.drawCircle(cx, cy + y, r, paint)
+    }
+  }
+}
+
+/**
+ * Beside the ring while talking: the dots while it listens and thinks, then the reply's line
+ * (two lines at most) with Undo when something was logged. Same shape and side as the flag pill.
+ */
+@SuppressLint("ViewConstructor")
+class VoicePillView(context: Context) : FrameLayout(context) {
+  val dots = DotsView(context)
+  val text = TextView(context).apply {
+    typeface = Fonts.medium(context)
+    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+    maxLines = 3
+    ellipsize = android.text.TextUtils.TruncateAt.END
+    maxWidth = context.dpi(220f)
+    // TalkBack reads each new line as it comes.
+    accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+    setLineSpacing(context.dp(2f), 1f)
+  }
+  val undo = TextView(context).apply {
+    typeface = Fonts.medium(context)
+    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+    text = "Undo"
+    isSingleLine = true
+    gravity = Gravity.CENTER
+    setPadding(context.dpi(12f), 0, context.dpi(12f), 0)
+    minHeight = context.dpi(36f)
+    isClickable = true
+    contentDescription = "Undo"
+  }
+  val row = LinearLayout(context).apply {
+    orientation = LinearLayout.HORIZONTAL
+    gravity = Gravity.CENTER_VERTICAL
+    minimumHeight = context.dpi(44f)
+    elevation = context.dp(4f)
+    isClickable = true
+  }
+
+  init {
+    clipChildren = false
+    setPadding(context.dpi(4f), context.dpi(4f), context.dpi(4f), context.dpi(4f))
+    row.addView(dots, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+    row.addView(text, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+    row.addView(undo, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+      marginStart = context.dpi(6f)
+    })
+    addView(row, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER_VERTICAL))
+    visibility = INVISIBLE
+  }
+
+  /** Listening or thinking (dots only), or a line (with Undo when `canUndo`). */
+  fun bind(c: Palette, ringOnRight: Boolean, ringSize: Int, line: String?, thinking: Boolean, canUndo: Boolean) {
+    dots.color = c.text
+    dots.thinking = thinking
+    dots.visibility = if (line == null) VISIBLE else GONE
+    text.visibility = if (line == null) GONE else VISIBLE
+    text.text = line ?: ""
+    text.setTextColor(c.text)
+    undo.visibility = if (canUndo) VISIBLE else GONE
+    undo.setTextColor(c.accent)
+    contentDescription = line ?: if (thinking) "Working on it" else "Listening"
+    val inner = ringSize / 2 + context.dpi(10f)
+    val outer = context.dpi(if (canUndo) 6f else 16f)
+    val v = context.dpi(8f)
+    if (ringOnRight) row.setPadding(outer, v, inner, v) else row.setPadding(inner, v, outer, v)
+    row.background = GradientDrawable().apply {
+      cornerRadius = context.dp(22f)
       setColor(withAlpha(c.surface, 0.97f))
       setStroke(context.dpi(1f), withAlpha(c.text, 0.12f))
     }
