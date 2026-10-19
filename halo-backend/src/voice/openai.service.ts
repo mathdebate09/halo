@@ -11,11 +11,21 @@ export class SpeechUnavailableError extends Error {
 }
 
 /**
- * Halo's own screens, and food and units an Indian English speaker names often, so the transcript
- * spells them right ("open the logger" was heard as "locker" without it).
+ * Halo's own screens and food words an Indian English speaker names often, so the transcript spells
+ * them right ("open the logger" was heard as "locker" without it). Kept short: on a near-silent
+ * clip the model can return the prompt itself, which `echoesPrompt` catches.
  */
-const VOCABULARY =
-  'Halo. Open the logger, the camera, the Advisor, weigh-in. Roti, chapati, dal, paneer, sabzi, idli, dosa, poha, upma, curd, rajma, chole, biryani, ml, kg, kcal, protein.';
+export const VOCABULARY = 'Halo, logger, Advisor, weigh-in, roti, dal, paneer, sabzi, idli, dosa, poha, curd.';
+
+const words = (s: string) => s.toLowerCase().match(/[\p{L}-]+/gu) ?? [];
+const VOCABULARY_WORDS = new Set(words(VOCABULARY));
+
+/** A transcript that is mostly the vocabulary prompt: nothing was really said. */
+export function echoesPrompt(heard: string): boolean {
+  const said = words(heard);
+  const hits = said.filter((w) => VOCABULARY_WORDS.has(w)).length;
+  return hits >= 4 && hits / said.length >= 0.4;
+}
 
 /** How the reply sounds: calm and unhurried, never upbeat. */
 const DELIVERY =

@@ -225,6 +225,28 @@ describe('a voice turn', () => {
     expect(reply.text).toBe('Taken back.');
   });
 
+  it('never claims a log it did not make: nudged once, then the claim is dropped', async () => {
+    const device = await registered();
+    heard = 'add a glass of water';
+    // Copies an earlier reply without the tool, then logs when nudged.
+    rounds = [answer('Added 250 ml.'), toolRound('', ['log_water', { ml: 250 }]), answer('Added 250 ml.')];
+    const reply = (await post(device, turn()).expect(200)).body as VoiceReply;
+    expect(reply.actions).toEqual([{ kind: 'water', ml: 250, label: 'Added 250 ml water' }]);
+    expect(reply.text).toBe('Added 250 ml.');
+    expect(requests[1]!.messages.at(-1)).toMatchObject({ role: 'system', content: expect.stringContaining('Nothing has been logged') });
+
+    const third = await registered();
+    rounds = [answer('Opening the logger.'), toolRound('', ['open', { target: 'logger' }]), answer('Opening the logger.')];
+    const opened = (await post(third, turn()).expect(200)).body as VoiceReply;
+    expect(opened.actions).toEqual([{ kind: 'open', target: 'logger' }]);
+
+    const other = await registered();
+    rounds = [answer('Added 250 ml.'), answer('Added 250 ml. Water is at 500 ml.'), answer('Added 250 ml.')];
+    const never = (await post(other, turn()).expect(200)).body as VoiceReply;
+    expect(never.actions).toEqual([]);
+    expect(never.text).toBe('Water is at 500 ml.');
+  });
+
   it('falls back to a plain line when nothing it said may be spoken', async () => {
     const device = await registered();
     rounds = [answer('That sounds like diabetes. Great job!')];
@@ -249,6 +271,16 @@ describe('a voice turn', () => {
     expect(reply.flag).toBe('urgent');
     expect(reply.text).toBe(RED_FLAG_REPLY.urgent);
     expect(fakeAi.stream).not.toHaveBeenCalled();
+  });
+});
+
+describe('one screen', () => {
+  it('opens only the first screen a reply asks for', async () => {
+    const device = await registered();
+    heard = 'open the logger and the advisor';
+    rounds = [toolRound('', ['open', { target: 'logger' }], ['open', { target: 'advisor' }]), answer('Opening the logger.')];
+    const reply = (await post(device, turn()).expect(200)).body as VoiceReply;
+    expect(reply.actions).toEqual([{ kind: 'open', target: 'logger' }]);
   });
 });
 
@@ -285,6 +317,14 @@ describe('limits and failures', () => {
     heard = ' . ';
     const res = await post(device, turn()).expect(422);
     expect(res.body).toEqual({ error: 'no_speech', line: VOICE_LINES.no_speech });
+    expect(fakeAi.stream).not.toHaveBeenCalled();
+  });
+
+  it('treats a transcript that repeats the vocabulary prompt as silence', async () => {
+    const device = await registered();
+    heard = 'Halo. Open the logger, the camera, the Advisor, weigh-in. Roti, chapati, dal, paneer, sabzi, idli.';
+    const res = await post(device, turn()).expect(422);
+    expect(res.body.error).toBe('no_speech');
     expect(fakeAi.stream).not.toHaveBeenCalled();
   });
 

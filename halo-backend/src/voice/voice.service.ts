@@ -17,12 +17,25 @@ import {
   type VoiceReply,
   type VoiceTurnRequest,
 } from '../shared/index.js';
-import { OpenAiService, SpeechUnavailableError } from './openai.service.js';
+import { echoesPrompt, OpenAiService, SpeechUnavailableError } from './openai.service.js';
 import { voicePrompt } from './voice.prompt.js';
 import { VoiceTools, voiceToolSpecs } from './voice.tools.js';
 
 /** A failed turn: the status, and the line the ring shows (never spoken). */
 const failure = (status: HttpStatus, error: VoiceError) => new HttpException({ error, line: VOICE_LINES[error] }, status);
+
+/** A sentence that says something was logged or taken back, or that a screen is opening. */
+const CLAIM = /\b(logged|added|saved|taken back|removed)\b/i;
+const OPENING = /\bopening\b/i;
+
+/** Claims an action this turn didn't take. */
+const unbacked = (text: string, actions: VoiceAction[]) =>
+  (CLAIM.test(text) && !actions.some((a) => a.kind !== 'open')) ||
+  (OPENING.test(text) && !actions.some((a) => a.kind === 'open'));
+
+/** Said when the model claimed a log without making it (it copied an earlier reply in the thread). */
+const NUDGE =
+  'Nothing has been logged, taken back or opened in this turn. If the person asked for one, call the tool now; otherwise answer without saying it was done.';
 
 /** The words a reply says when nothing it wrote passed the guard but it did act. */
 function saidForActions(actions: VoiceAction[]): string | null {
@@ -104,7 +117,7 @@ export class VoiceService {
     try {
       const deadline = AbortSignal.timeout(this.env.VOICE_TURN_MS);
       const heard = await this.openai.transcribe(wav, deadline);
-      if (!/[\p{L}\d]/u.test(heard)) throw failure(HttpStatus.UNPROCESSABLE_ENTITY, 'no_speech');
+      if (!/[\p{L}\d]/u.test(heard) || echoesPrompt(heard)) throw failure(HttpStatus.UNPROCESSABLE_ENTITY, 'no_speech');
 
       const flag = redFlag(heard);
       let text: string;
@@ -132,12 +145,14 @@ export class VoiceService {
     const ctx = req.context;
     const messages: ChatMessage[] = [
       { role: 'system', content: voicePrompt(ctx, req.flag) },
-      ...req.history.map((h): ChatMessage => ({ role: h.role, content: h.content })),
+      // The last exchange only: enough for "and one more", too little to make an old log look done.
+      ...req.history.slice(-2).map((h): ChatMessage => ({ role: h.role, content: h.content })),
       { role: 'user', content: heard },
     ];
     const tools = voiceToolSpecs(ctx);
     const guard = voiceGuard();
     const actions: VoiceAction[] = [];
+    let nudged = false;
 
     for (let round = 0; round < VOICE_LIMITS.toolRounds; round++) {
       const last = round === VOICE_LIMITS.toolRounds - 1;
@@ -169,6 +184,9 @@ export class VoiceService {
           let outcome = await this.tools.run(call, ctx);
           if (outcome.action && actions.length >= VOICE_LIMITS.actions) {
             outcome = { result: { error: 'Enough was done in one go; nothing more.' } };
+          } else if (outcome.action?.kind === 'open' && actions.some((a) => a.kind === 'open')) {
+            // One screen comes forward; a second would cover it.
+            outcome = { result: { error: 'One screen is already opening.' } };
           }
           if (outcome.action) actions.push(outcome.action);
           messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(outcome.result) });
@@ -176,8 +194,18 @@ export class VoiceService {
         continue;
       }
 
+      // A reply never claims what didn't happen (a log, an Undo, a screen): one nudge to do it, else
+      // the claim is dropped.
+      if (unbacked(text, actions) && !last && !nudged) {
+        nudged = true;
+        messages.push({ role: 'assistant', content: text }, { role: 'system', content: NUDGE });
+        continue;
+      }
       // A cut-off answer keeps its whole sentences only.
-      for (const sentence of splitSentences(text, end.finish !== 'length').sentences) guard.push(sentence);
+      for (const sentence of splitSentences(text, end.finish !== 'length').sentences) {
+        if (unbacked(sentence, actions)) continue;
+        guard.push(sentence);
+      }
       break;
     }
 
