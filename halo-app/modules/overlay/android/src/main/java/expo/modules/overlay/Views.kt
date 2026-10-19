@@ -360,7 +360,7 @@ class DotsView(context: Context) : View(context) {
 
 /**
  * Beside the ring while talking: the dots while it listens and thinks, then the reply's line
- * (two lines at most) with Undo when something was logged. Same shape and side as the flag pill.
+ * (three lines at most); Undo lives on the notification. Same shape and side as the flag pill.
  */
 @SuppressLint("ViewConstructor")
 class VoicePillView(context: Context) : FrameLayout(context) {
@@ -375,17 +375,6 @@ class VoicePillView(context: Context) : FrameLayout(context) {
     accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
     setLineSpacing(context.dp(2f), 1f)
   }
-  val undo = TextView(context).apply {
-    typeface = Fonts.medium(context)
-    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-    text = "Undo"
-    isSingleLine = true
-    gravity = Gravity.CENTER
-    setPadding(context.dpi(12f), 0, context.dpi(12f), 0)
-    minHeight = context.dpi(36f)
-    isClickable = true
-    contentDescription = "Undo"
-  }
   val row = LinearLayout(context).apply {
     orientation = LinearLayout.HORIZONTAL
     gravity = Gravity.CENTER_VERTICAL
@@ -399,26 +388,21 @@ class VoicePillView(context: Context) : FrameLayout(context) {
     setPadding(context.dpi(4f), context.dpi(4f), context.dpi(4f), context.dpi(4f))
     row.addView(dots, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     row.addView(text, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
-    row.addView(undo, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-      marginStart = context.dpi(6f)
-    })
     addView(row, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER_VERTICAL))
     visibility = INVISIBLE
   }
 
-  /** Listening or thinking (dots only), or a line (with Undo when `canUndo`). */
-  fun bind(c: Palette, ringOnRight: Boolean, ringSize: Int, line: String?, thinking: Boolean, canUndo: Boolean) {
+  /** Listening or thinking (dots only), or a line. */
+  fun bind(c: Palette, ringOnRight: Boolean, ringSize: Int, line: String?, thinking: Boolean) {
     dots.color = c.text
     dots.thinking = thinking
     dots.visibility = if (line == null) VISIBLE else GONE
     text.visibility = if (line == null) GONE else VISIBLE
     text.text = line ?: ""
     text.setTextColor(c.text)
-    undo.visibility = if (canUndo) VISIBLE else GONE
-    undo.setTextColor(c.accent)
     contentDescription = line ?: if (thinking) "Working on it" else "Listening"
     val inner = ringSize / 2 + context.dpi(10f)
-    val outer = context.dpi(if (canUndo) 6f else 16f)
+    val outer = context.dpi(16f)
     val v = context.dpi(8f)
     if (ringOnRight) row.setPadding(outer, v, inner, v) else row.setPadding(inner, v, outer, v)
     row.background = GradientDrawable().apply {

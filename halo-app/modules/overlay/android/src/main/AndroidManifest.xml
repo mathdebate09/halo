@@ -2,7 +2,6 @@
   <!-- "Display over other apps": a special permission the user grants in Settings. -->
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
   <!-- A voice log from the ring: the service takes the microphone type only while it records. -->
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -11,14 +10,11 @@
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
   <application>
+    <!-- Not a foreground service while it only draws the ring; microphone while a voice log records. -->
     <service
       android:name="expo.modules.overlay.OverlayService"
       android:exported="false"
-      android:foregroundServiceType="specialUse|microphone">
-      <property
-        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-        android:value="Keeps the user's health scores and one prepared step on screen over other apps, at their request." />
-    </service>
+      android:foregroundServiceType="microphone" />
     <!-- Undo on a voice log's notification. -->
     <receiver
       android:name="expo.modules.overlay.VoiceUndoReceiver"

@@ -38,7 +38,9 @@ import org.json.JSONObject
 import java.util.UUID
 import kotlin.math.hypot
 
-// The floating overlay: a foreground service that keeps Halo's ring over other apps. It reads the
+// The floating overlay: a service that keeps Halo's ring over other apps. Its visible window keeps
+// the process perceptible, so it runs without a foreground notification; it only becomes a
+// foreground service (microphone) while a voice log records. It reads the
 // snapshot Halo last wrote and only shows what the PA already decided; anything logged here goes
 // into a queue that Halo drains into its own store and outbox (local-first, nothing waits on it).
 // A tap on the ring talks (chunk 27): it puts the alarm away, listens, sends the recording to Halo's
@@ -78,9 +80,6 @@ class OverlayService : Service() {
   @Volatile private var speaking = false
   /** The alarm the tap put away: the turn is about it, and a matching log answers it. */
   private var voiceFlag: Flag? = null
-  /** What the reply on screen logged, for its Undo. */
-  private var replyLogs: List<String> = emptyList()
-  private var replyNotification = 0
   private val tuckVoice = Runnable { endVoice() }
   private val client by lazy { VoiceClient(this) }
 
@@ -90,7 +89,8 @@ class OverlayService : Service() {
     super.onCreate()
     wm = getSystemService(WINDOW_SERVICE) as WindowManager
     OverlayBus.service = this
-    startAsForeground()
+    // The old always-on "Halo is on screen" notification and its channel are gone.
+    getSystemService(NotificationManager::class.java).deleteNotificationChannel("overlay")
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -137,34 +137,6 @@ class OverlayService : Service() {
     val info = ActivityManager.RunningAppProcessInfo()
     ActivityManager.getMyMemoryState(info)
     return info.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
-  }
-
-  // ── Foreground notification ────────────────────────────────────────────────────
-
-  private var notification: Notification? = null
-
-  private fun startAsForeground() {
-    val manager = getSystemService(NotificationManager::class.java)
-    manager.createNotificationChannel(
-      NotificationChannel(CHANNEL, "On screen", NotificationManager.IMPORTANCE_MIN).apply { setShowBadge(false) },
-    )
-    val open = packageManager.getLaunchIntentForPackage(packageName)
-    val tap = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-    val icon = resources.getIdentifier("notification_icon", "drawable", packageName).takeIf { it != 0 }
-      ?: applicationInfo.icon
-    val notification = Notification.Builder(this, CHANNEL)
-      .setSmallIcon(icon)
-      .setContentTitle("Halo is on screen")
-      .setContentText("Drag the ring to the × to hide it.")
-      .setContentIntent(tap)
-      .setOngoing(true)
-      .build()
-    this.notification = notification
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-      startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-    } else {
-      startForeground(NOTIFICATION_ID, notification)
-    }
   }
 
   // ── The bubble ─────────────────────────────────────────────────────────────────
@@ -478,17 +450,27 @@ class OverlayService : Service() {
   // ── The microphone ─────────────────────────────────────────────────────────────
 
   /**
-   * Adds the microphone type to this service while a voice log records (Android 11+ needs the
-   * type for mic access from a foreground service). Null when it worked, else what went wrong.
+   * Makes this a foreground service of type microphone while a voice log records (Android needs it
+   * for mic access from a service), with the notification that requires. Null when it worked, else
+   * what went wrong.
    */
   fun beginMic(): String? {
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return "no_permission"
-    val n = notification ?: return "no_notification"
+    val manager = getSystemService(NotificationManager::class.java)
+    manager.createNotificationChannel(
+      NotificationChannel(LISTEN_CHANNEL, "Listening", NotificationManager.IMPORTANCE_MIN).apply { setShowBadge(false) },
+    )
+    val icon = resources.getIdentifier("notification_icon", "drawable", packageName).takeIf { it != 0 } ?: applicationInfo.icon
+    val n = Notification.Builder(this, LISTEN_CHANNEL)
+      .setSmallIcon(icon)
+      .setContentTitle("Halo is listening")
+      .setOngoing(true)
+      .build()
     return try {
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-        startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
-      } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+      } else {
+        startForeground(NOTIFICATION_ID, n)
       }
       null
     } catch (e: Exception) {
@@ -496,16 +478,9 @@ class OverlayService : Service() {
     }
   }
 
-  /** Back to the overlay's own type once recording ends. */
+  /** Recording ended: no longer a foreground service, and its notification goes. */
   fun endMic() {
-    val n = notification ?: return
-    runCatching {
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-        startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-      } else {
-        startForeground(NOTIFICATION_ID, n)
-      }
-    }
+    runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
   }
 
   // ── Voice ──────────────────────────────────────────────────────────────────────
@@ -517,7 +492,6 @@ class OverlayService : Service() {
       WindowManager.LayoutParams.WRAP_CONTENT,
       WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
     ).apply { gravity = Gravity.TOP or Gravity.START }
-    view.undo.setOnClickListener { undoReply() }
     // A tap on the line itself puts it away.
     view.row.setOnClickListener { if (voice == Voice.REPLYING && !speaking) endVoice() }
     wm.addView(view, params)
@@ -526,19 +500,19 @@ class OverlayService : Service() {
   }
 
   /** Dots while listening or thinking (`line` null), else a line, beside the ring like the flag pill. */
-  private fun showVoicePill(line: String?, thinking: Boolean = false, canUndo: Boolean = false) {
+  private fun showVoicePill(line: String?, thinking: Boolean = false) {
     val view = voicePill ?: return
     val params = voicePillParams ?: return
     val ring = bubbleParams ?: return
     val s = Snapshot.parse(OverlayStore.snapshot(this)) ?: return
     if (haloOnScreen()) return
     val onRight = ring.x + size / 2 > screenW / 2
-    view.bind(s.colors, onRight, size, line, thinking, canUndo)
+    view.bind(s.colors, onRight, size, line, thinking)
     view.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
     val w = view.measuredWidth
     val h = view.measuredHeight
     // Its own size, not WRAP_CONTENT: Android first fits a wrapping window to a dialog's width,
-    // which squeezed Undo off the end.
+    // which squeezed the line.
     params.width = w
     params.height = h
     params.x = if (onRight) ring.x + size / 2 - w + dpi(4f) else ring.x + size / 2 - dpi(4f)
@@ -652,7 +626,6 @@ class OverlayService : Service() {
   /** A line of its own (no speech): an error, offline, on a call. */
   private fun voiceLine(line: String) {
     voice = Voice.REPLYING
-    replyLogs = emptyList()
     render()
     showVoicePill(line)
     main.removeCallbacks(tuckVoice)
@@ -669,10 +642,9 @@ class OverlayService : Service() {
   private fun onReply(reply: VoiceReply) {
     if (voice != Voice.THINKING) return
     val logs = applyActions(reply)
-    replyLogs = logs.map { it.first }
     voice = Voice.REPLYING
     render()
-    showVoicePill(reply.text, canUndo = logs.isNotEmpty())
+    showVoicePill(reply.text)
     if (logs.isNotEmpty()) notifyLogs(reply, logs)
     speak(reply)
   }
@@ -725,14 +697,13 @@ class OverlayService : Service() {
     return logs
   }
 
-  /** Each change gets a quiet notification with Undo (the user's call: act, then tell). */
+  /** Each change gets a quiet notification with Undo, its only Undo (the user's call: act, then tell). */
   private fun notifyLogs(reply: VoiceReply, logs: List<Pair<String, String>>) {
     val manager = getSystemService(NotificationManager::class.java)
     manager.createNotificationChannel(
       NotificationChannel(VOICE_CHANNEL, "Voice logs", NotificationManager.IMPORTANCE_LOW).apply { setShowBadge(false) },
     )
     val id = reply.turnId.hashCode()
-    replyNotification = id
     val undo = Intent(this, VoiceUndoReceiver::class.java)
       .putExtra(VoiceUndoReceiver.IDS, logs.map { it.first }.toTypedArray())
       .putExtra(VoiceUndoReceiver.NOTIFICATION, id)
@@ -749,15 +720,6 @@ class OverlayService : Service() {
       .addAction(Notification.Action.Builder(null, "Undo", undoIntent).build())
       .build()
     runCatching { manager.notify(id, notification) }
-  }
-
-  private fun undoReply() {
-    if (replyLogs.isEmpty()) return
-    VoiceUndoReceiver.undo(this, replyLogs, replyNotification)
-    replyLogs = emptyList()
-    showVoicePill("Taken back.")
-    main.removeCallbacks(tuckVoice)
-    main.postDelayed(tuckVoice, LINE_MS)
   }
 
   /** Speaks the reply when the phone allows it (not under DND or on a call); the line stays meanwhile. */
@@ -842,7 +804,7 @@ class OverlayService : Service() {
   }
 
   companion object {
-    private const val CHANNEL = "overlay"
+    private const val LISTEN_CHANNEL = "listening"
     private const val NOTIFICATION_ID = 7341
     /** A pill put away comes back after this long if the flag still needs them. */
     private const val AGAIN_MS = 15 * 60_000L
@@ -853,8 +815,9 @@ class OverlayService : Service() {
     /** Starts the overlay if it may draw and wasn't dragged away. Returns whether it started. */
     fun start(context: Context): Boolean {
       if (!Settings.canDrawOverlays(context) || OverlayStore.closed(context)) return false
-      ContextCompat.startForegroundService(context, Intent(context, OverlayService::class.java))
-      return true
+      // A plain service: from Halo, after a boot or an update (both may start one). Elsewhere in the
+      // background Android refuses, and the ring comes back on the next open of Halo.
+      return runCatching { context.startService(Intent(context, OverlayService::class.java)) }.isSuccess
     }
   }
 }
