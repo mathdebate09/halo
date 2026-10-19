@@ -82,6 +82,9 @@ function read<T>(key: string, fallback: T): T {
   }
 }
 const write = (key: string, value: unknown) => kv.set(key, JSON.stringify(value));
+
+/** What already went out, so another plan (the overlay's) keeps the same caps and spacing. */
+export const readDelivered = (): Delivered[] => read<DeliveredEntry[]>(DELIVERED_KEY, []);
 const remember = (key: string, id: string) =>
   write(key, [id, ...read<string[]>(key, []).filter((x) => x !== id)].slice(0, KEEP_IDS));
 
@@ -322,7 +325,7 @@ let running = false;
 let again: (() => void) | null = null;
 
 /** A moment in the brief's words at its hour (reworded when cached), as the tray shows it. */
-function wordMoment(m: Moment, tier: Tier, goal: Goal) {
+export function wordMoment(m: Moment, tier: Tier, goal: Goal) {
   const item = phraseItemFor(m.insight, tier, hourOfDay(new Date(m.at)), goal);
   const words = wordsFor(m.insight, item?.key ?? null);
   const insight: NotifiedInsight = {
