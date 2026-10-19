@@ -95,7 +95,8 @@ function vet(ctx: PaContext, signals: Signal[]): { kept: Signal[]; dropped: Drop
 
   // Back off what keeps getting ignored; go easy on what they already acted on today.
   for (const s of kept) {
-    if (ignoredStreak(ctx.history, s.type) >= IGNORE_LIMIT) {
+    // A critical reading is never backed off: it says itself until the reading comes back.
+    if (s.type !== 'vital_alert' && ignoredStreak(ctx.history, s.type) >= IGNORE_LIMIT) {
       s.severity *= 0.5;
       notes.set(s.id, `ignored ${IGNORE_LIMIT}+ times, demoted`);
     } else if (ctx.history.some((r) => r.id === s.id && r.state === 'acted')) {
@@ -127,7 +128,8 @@ export function brief(ctx: PaContext, held: Held = null): Brief {
 
   let isHeld = false;
   const current = held && ranked.find((r) => r.signal.id === held.id);
-  if (current && current !== pick && pick.score < current.score + HOLD_MARGIN) {
+  // Nothing holds a critical reading back.
+  if (current && current !== pick && pick.signal.type !== 'vital_alert' && pick.score < current.score + HOLD_MARGIN) {
     pick = current;
     isHeld = true;
   }

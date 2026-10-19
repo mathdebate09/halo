@@ -14,6 +14,7 @@ import { IGNORE_LIMIT, ignoredStreak, outcomeLine } from './loop.js';
 import { rankSignals } from './pa.js';
 import { expectedDayFraction, expectedIntakeFraction } from './scoring.js';
 import {
+  atHour,
   bedtimeOf,
   type Insight,
   type InsightKind,
@@ -34,13 +35,14 @@ const MUTE_DAYS = 3;
 const STEP_HOURS = 0.25;
 
 /** One Android channel per kind of moment, so the user can mute any of them on their own. */
-export type NotifyChannel = 'meals' | 'pace' | 'weight' | 'sleep' | 'review';
+export type NotifyChannel = 'meals' | 'pace' | 'weight' | 'sleep' | 'review' | 'readings';
 export const NOTIFY_CHANNELS: Record<NotifyChannel, string> = {
   meals: 'Meal times',
   pace: 'Daily pace',
   weight: 'Weigh-in',
   sleep: 'Bedtime',
   review: 'Reviews',
+  readings: 'Readings',
 };
 export const CHANNEL_OF: Record<InsightKind, NotifyChannel> = {
   meal_window: 'meals',
@@ -58,9 +60,11 @@ export const CHANNEL_OF: Record<InsightKind, NotifyChannel> = {
   quiet_days: 'review',
   on_track: 'review',
   blood_work: 'review',
+  vital_alert: 'readings',
 };
 
 export type MomentKind =
+  | 'alert'
   | 'weigh_in'
   | 'breakfast'
   | 'lunch'
@@ -73,6 +77,7 @@ export type MomentKind =
 
 /** What each moment may carry: a meal moment only its meal, the pace check only a gap, etc. */
 const CARRIES: Record<MomentKind, readonly InsightKind[]> = {
+  alert: ['vital_alert'],
   weigh_in: ['weigh_in'],
   breakfast: ['meal_window'],
   lunch: ['meal_window'],
@@ -238,6 +243,22 @@ export function planDay(ctx: PaContext, delivered: readonly Delivered[] = []): M
     at >= ctx.now + MIN_LEAD_MS &&
     (ctx.lastLogAt == null || at - ctx.lastLogAt >= AFTER_LOG_MS) &&
     taken.every((t) => Math.abs(t - at) >= MIN_GAP_MS);
+
+  // A critical reading goes out now, past the cap, the spacing and a recent log; quiet hours still
+  // hold it until the usual wake time (Today says it first in the meantime).
+  const alert = rankSignals(ctx).ranked.find(({ signal }) => signal.type === 'vital_alert')?.signal;
+  if (alert && !sent.has(alert.id)) {
+    const at = inQuietHours(ctx.hour, bed, wake) ? atHour(ctx, wake) : ctx.now + MIN_LEAD_MS;
+    planned.push({
+      at,
+      day: ctx.day,
+      moment: 'alert',
+      insight: { ...alert, copy: briefCopy(alert) },
+      lead: null,
+      channel: CHANNEL_OF.vital_alert,
+    });
+    taken.push(at);
+  }
 
   for (const c of candidates) {
     if (today.length + planned.length >= MAX_PER_DAY) break;

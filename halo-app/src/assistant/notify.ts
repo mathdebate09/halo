@@ -146,7 +146,11 @@ export async function setupNotifications() {
   for (const [id, name] of Object.entries(NOTIFY_CHANNELS)) {
     await Notifications.setNotificationChannelAsync(id, {
       name,
-      importance: Notifications.AndroidImportance.DEFAULT,
+      // A critical reading should reach the user (heads-up); the rest stay calm.
+      importance:
+        id === 'readings'
+          ? Notifications.AndroidImportance.HIGH
+          : Notifications.AndroidImportance.DEFAULT,
     });
   }
   const later = {

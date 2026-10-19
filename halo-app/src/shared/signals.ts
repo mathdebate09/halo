@@ -44,6 +44,7 @@ export const INSIGHT_KINDS = [
   'quiet_days',
   'on_track',
   'blood_work',
+  'vital_alert',
 ] as const;
 export type InsightKind = (typeof INSIGHT_KINDS)[number];
 
@@ -124,6 +125,17 @@ export type PaContext = {
   usageAccess?: 'granted' | 'denied' | 'unavailable';
   /** The latest report added and the familiar factors of all reports. */
   bloodWork?: { reportId: string; addedDay: string; factors: readonly Factor[] } | null;
+  /** Today's latest measured readings: Health Connect or the user's own entry, never a report. */
+  readings?: VitalReadings | null;
+};
+
+export type VitalReadings = {
+  restingHr?: number | null;
+  spo2?: number | null;
+  systolic?: number | null;
+  diastolic?: number | null;
+  glucoseMgDl?: number | null;
+  bodyTempC?: number | null;
 };
 
 export type WeekStats = { days: number; avg: number; prevAvg: number | null };
@@ -515,6 +527,84 @@ function bloodWorkBrief(ctx: PaContext): Signal | null {
   };
 }
 
+/** A reading this far out is worth saying now, ahead of anything else. Never a diagnosis. */
+type AlertRule = {
+  metric: string;
+  label: string;
+  /** The reading as said, or null when it isn't critical. */
+  check: (r: VitalReadings) => { reading: string; side: 'above' | 'below' } | null;
+  /** The same typical band the Vitals row is drawn against. */
+  typical: string;
+};
+
+const fmtReading = (v: number, digits = 0) => String(round(v, digits));
+
+/** In order of urgency: the first that fires is the one said. */
+const ALERTS: readonly AlertRule[] = [
+  {
+    metric: 'spo2',
+    label: 'Blood oxygen',
+    typical: '95–100%',
+    check: ({ spo2 }) => (spo2 != null && spo2 < 92 ? { reading: `${fmtReading(spo2)}%`, side: 'below' } : null),
+  },
+  {
+    metric: 'blood_pressure',
+    label: 'Blood pressure',
+    typical: '90/60–120/80',
+    check: ({ systolic: s, diastolic: d }) =>
+      s != null && d != null && (s >= 160 || d >= 100) ? { reading: `${fmtReading(s)}/${fmtReading(d)}`, side: 'above' } : null,
+  },
+  {
+    metric: 'glucose',
+    label: 'Glucose',
+    typical: '70–140 mg/dL',
+    check: ({ glucoseMgDl: g }) =>
+      g == null ? null : g < 70 ? { reading: `${fmtReading(g)} mg/dL`, side: 'below' } : g >= 200 ? { reading: `${fmtReading(g)} mg/dL`, side: 'above' } : null,
+  },
+  {
+    metric: 'resting_hr',
+    label: 'Resting heart rate',
+    typical: '50–80 bpm',
+    check: ({ restingHr: hr }) =>
+      hr == null ? null : hr > 100 ? { reading: `${fmtReading(hr)} bpm`, side: 'above' } : hr < 40 ? { reading: `${fmtReading(hr)} bpm`, side: 'below' } : null,
+  },
+  {
+    metric: 'body_temp',
+    label: 'Body temperature',
+    typical: '36.1–37.2 °C',
+    check: ({ bodyTempC: t }) => (t != null && t >= 38 ? { reading: `${fmtReading(t, 1)} °C`, side: 'above' } : null),
+  },
+];
+
+/**
+ * A measured reading today far outside its typical range: said first, everywhere, with the
+ * reading and the range it's compared with. Estimates and report values never raise it.
+ */
+/** The most urgent critical reading, if any. */
+export function criticalReading(readings: VitalReadings | null | undefined) {
+  if (!readings) return null;
+  for (const rule of ALERTS) {
+    const hit = rule.check(readings);
+    if (hit) return { ...hit, metric: rule.metric, label: rule.label, typical: rule.typical };
+  }
+  return null;
+}
+
+function vitalAlert(ctx: PaContext): Signal | null {
+  const alert = criticalReading(ctx.readings);
+  if (!alert) return null;
+  return {
+    id: `${ctx.day}:vital_alert:${alert.metric}`,
+    type: 'vital_alert',
+    severity: 95,
+    reason: 'A reading this far from its usual range is worth a second look today.',
+    action: { kind: 'advisor' },
+    expiresAt: atHour(ctx, 27.5),
+    tab: null,
+    facts: { metric: alert.metric, label: alert.label, reading: alert.reading, side: alert.side, typical: alert.typical },
+  };
+}
+
 const dayGap = (from: string, to: string) =>
   Math.round((dayStart(to).getTime() - dayStart(from).getTime()) / 86_400_000);
 
@@ -547,5 +637,6 @@ export function detectSignals(ctx: PaContext, weighDue: boolean): Signal[] {
     sleepPatternBrief(ctx),
     weeklyReview(ctx),
     bloodWorkBrief(ctx),
+    vitalAlert(ctx),
   ].filter((s): s is Signal => s != null);
 }

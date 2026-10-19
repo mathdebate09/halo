@@ -6,7 +6,7 @@ import { and, desc, eq, gte, isNotNull, isNull, max } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { createContext, type ReactNode, use, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import { useMMKVBoolean } from 'react-native-mmkv';
+import { useMMKVBoolean, useMMKVString } from 'react-native-mmkv';
 
 import { db } from '@/db/client';
 import { dailyScores, hcDaily, meals, water, weights } from '@/db/schema';
@@ -16,12 +16,15 @@ import {
   bedtimeOf,
   brief,
   type Brief,
+  criticalReading,
   dayHour,
   dayKey,
   dayStart,
   nightShape,
   type PaContext,
   transitions,
+  type VitalReadings,
+  type VitalsInput,
   weighInDue,
   type WeekStats,
 } from '@/shared';
@@ -50,6 +53,8 @@ const HELD_KEY = 'assistant.held';
 export const TRACE_KEY = 'assistant.trace';
 /** The current brief, shaped for a notification (dev screen's real test). */
 export const CURRENT_BRIEF_KEY = 'assistant.currentBrief';
+/** Dev builds only: a fake reading (JSON `VitalReadings`) laid over today's, to see the critical path. */
+export const DEV_READING_KEY = 'dev.fakeReading';
 
 export type Assistant = {
   brief: Brief;
@@ -77,6 +82,26 @@ function weekStats(rows: { day: string; overall: number | null }[], day: string)
 }
 
 const num = (v: string | number | null | undefined) => (v == null ? null : Number(v));
+
+const READING_FIELDS = [
+  'restingHr',
+  'spo2',
+  'systolic',
+  'diastolic',
+  'glucoseMgDl',
+  'bodyTempC',
+] as const;
+
+/** Today's measured readings for the PA's critical check: report values never count. */
+function measuredToday(input: VitalsInput, day: string): VitalReadings | null {
+  const today = input.days.find((d) => d.day === day);
+  if (!today) return null;
+  const out: VitalReadings = {};
+  for (const field of READING_FIELDS) {
+    if (!today.fromReport?.includes(field)) out[field] = today[field] ?? null;
+  }
+  return out;
+}
 
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const scores = useTodayScores();
@@ -165,6 +190,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     [day],
   );
   const [wakeAskDone] = useMMKVBoolean(WAKE_ASK_DONE_KEY, kv);
+  const [fakeReading] = useMMKVString(DEV_READING_KEY, kv);
   // The newest report added, for its one brief while it's new.
   const { factors: bloodFactors } = useLabResults();
   const newestReport = useAddedReports().reduce<{ id: string; createdAt: number } | null>(
@@ -211,6 +237,13 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
           factors: bloodFactors,
         }
       : null,
+    readings:
+      __DEV__ && fakeReading
+        ? {
+            ...measuredToday(scores.vitalsInput, day),
+            ...(JSON.parse(fakeReading) as VitalReadings),
+          }
+        : measuredToday(scores.vitalsInput, day),
   };
 
   const heldId = kv.getString(HELD_KEY) ?? null;
@@ -235,6 +268,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   latest.current = { context, tier: target.tier };
   const planKey = [
     day,
+    // A critical reading goes out at once, so a new one re-plans.
+    criticalReading(context.readings)?.metric,
     facts.mealsLogged,
     facts.waterMl,
     context.weighedToday,

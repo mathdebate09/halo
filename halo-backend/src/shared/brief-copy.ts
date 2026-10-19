@@ -131,6 +131,11 @@ const COPY: Record<Signal['type'], (s: Signal) => InsightCopy> = {
     line: 'Nothing needs you right now.',
     actionLabel: null,
   }),
+  vital_alert: ({ facts: f }) => ({
+    tagline: 'Check this reading',
+    line: `${f.label} read ${f.reading}, ${f.side} the typical ${f.typical}. Measure again, and see a doctor if it stays there.`,
+    actionLabel: 'Ask the Advisor',
+  }),
   blood_work: ({ facts: f }) =>
     f.focus === 'in_range'
       ? {

@@ -37,7 +37,7 @@ import { and, count, desc, eq, isNull, sum } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 
 import { POLL_ONLY_KEY } from '@/advisor/client';
-import { TRACE_KEY } from '@/assistant/assistant';
+import { DEV_READING_KEY, TRACE_KEY } from '@/assistant/assistant';
 import { VITALS_TRACE_KEY } from '@/today/today-scores';
 import { revertActed } from '@/assistant/loop-store';
 import {
@@ -364,6 +364,25 @@ function TodayRow() {
   );
 }
 
+const FAKE_READINGS = [
+  { label: 'SpO2 89%', reading: { spo2: 89 } },
+  { label: 'BP 170/105', reading: { systolic: 170, diastolic: 105 } },
+  { label: 'HR 112', reading: { restingHr: 112 } },
+] as const;
+
+/** A critical reading laid over today's (never written to the store), to see vital_alert end to end. */
+function FakeReadingRow() {
+  const [raw, setRaw] = useMMKVString(DEV_READING_KEY, kv);
+  return (
+    <Row title="Critical reading (fake)" status={raw ?? 'off'}>
+      {FAKE_READINGS.map((f) => (
+        <Btn key={f.label} label={f.label} onPress={() => setRaw(JSON.stringify(f.reading))} />
+      ))}
+      <Btn label="Off" onPress={() => setRaw(undefined)} />
+    </Row>
+  );
+}
+
 /** The Advisor's fallback: skip SSE and poll the turn, as a phone without streaming would. */
 function AdvisorRow() {
   const [pollOnly, setPollOnly] = useMMKVBoolean(POLL_ONLY_KEY, kv);
@@ -610,6 +629,7 @@ export default function DevScreen() {
         <OnboardingRow />
         <ThemesRow />
         <TodayRow />
+        <FakeReadingRow />
         <AssistantRow />
         <VitalsRow />
         <AdvisorRow />

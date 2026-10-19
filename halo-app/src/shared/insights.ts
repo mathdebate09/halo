@@ -43,6 +43,7 @@ export type NextAction =
   | { kind: 'ask_wake' }
   | { kind: 'usage_access' }
   | { kind: 'blood_work' }
+  | { kind: 'advisor' }
   | null;
 
 export type Panel = {

@@ -541,6 +541,7 @@ const DEFAULT_STARTER = 'What matters most today?';
 export function starterQuestion(brief: { type: InsightKind; facts: InsightFacts } | null): string {
   if (!brief) return DEFAULT_STARTER;
   if (brief.type === 'meal_window') return MEAL_STARTER[String(brief.facts.meal)] ?? DEFAULT_STARTER;
+  if (brief.type === 'vital_alert') return `What does my ${String(brief.facts.label).toLowerCase()} reading mean?`;
   return STARTERS[brief.type] ?? DEFAULT_STARTER;
 }
 

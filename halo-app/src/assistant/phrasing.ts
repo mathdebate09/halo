@@ -63,14 +63,15 @@ function writePhrase(key: string, copy: InsightCopy) {
   kv.set(INDEX_KEY, JSON.stringify(index.slice(0, MAX_ENTRIES)));
 }
 
-/** The phrase request for a brief, or null for on-track days (the tier's lines speak then). */
+/** The phrase request for a brief, or null for on-track days (the tier's lines speak then) and critical readings. */
 export function phraseItemFor(
   insight: Insight,
   tier: Tier,
   hour: number,
   goal: Goal,
 ): PhraseItem | null {
-  if (insight.type === 'on_track') return null;
+  // A critical reading keeps its exact template words: safety copy is never reworded.
+  if (insight.type === 'on_track' || insight.type === 'vital_alert') return null;
   const base = {
     kind: insight.type,
     tier,

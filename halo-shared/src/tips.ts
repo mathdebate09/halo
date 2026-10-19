@@ -31,7 +31,7 @@ export type Tip = {
 const KINDS: Record<TipArea, readonly InsightKind[]> = {
   diet: ['meal_window', 'protein_pace', 'calorie_pace', 'calorie_over', 'water_pace'],
   activity: [],
-  vitals: ['sleep_debt', 'bedtime', 'sleep_pattern', 'blood_work', 'usage_ask'],
+  vitals: ['vital_alert', 'sleep_debt', 'bedtime', 'sleep_pattern', 'blood_work', 'usage_ask'],
 };
 
 const FOCUS: Partial<Record<InsightKind, AreaKey>> = {
@@ -64,11 +64,13 @@ const fromSignal = (area: TipArea, s: Signal, ctx: PaContext): Tip => {
   return {
     area,
     line: copy.line,
+    // A critical reading's line already names the reading and its range.
     facts: area === 'diet' ? dietFacts(s.type, ctx) : null,
     action: s.action,
     actionLabel: s.action ? copy.actionLabel : null,
     briefId: s.id,
     insight: { ...s, copy },
+    // No focus for a critical reading: another row's numbers beside it would muddle it.
     focus: area === 'vitals' ? (FOCUS[s.type] ?? null) : null,
   };
 };

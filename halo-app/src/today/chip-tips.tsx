@@ -131,7 +131,9 @@ export function TodayChips({ scores, scrollY, closeAt, color, words }: Props) {
   // A tip that is the brief on the hero says it in the hero's words.
   const line = tip && tip.briefId === brief.insight.id ? words.line : tip?.line;
   const facts =
-    tip?.area === 'vitals' ? vitalsFacts(tip, scores, units.weight === 'lb') : (tip?.facts ?? null);
+    tip?.area === 'vitals'
+      ? (tip.facts ?? vitalsFacts(tip, scores, units.weight === 'lb'))
+      : (tip?.facts ?? null);
   const shownId = tip?.insight?.id;
   useEffect(() => {
     if (tip?.insight) recordShown(tip.insight, scores.day, 'today');

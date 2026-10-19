@@ -6,7 +6,7 @@
 
 import { addDays } from './day';
 import { behind } from './insights';
-import type { InsightKind, InsightRecord, InsightState, PaContext } from './signals';
+import { criticalReading, type InsightKind, type InsightRecord, type InsightState, type PaContext } from './signals';
 import { round } from './units';
 
 /** Ignored this many times in a row, a kind stops being pushed for a while. */
@@ -66,6 +66,8 @@ export function isResolved(record: InsightRecord, ctx: PaContext): boolean {
       return !!ctx.wakeAsked;
     case 'usage_ask':
       return ctx.usageAccess === 'granted';
+    case 'vital_alert':
+      return ctx.readings != null && criticalReading(ctx.readings)?.metric !== record.id.split(':')[2];
     default:
       // Calories over can't un-happen; sleep is judged by the next night.
       return false;
