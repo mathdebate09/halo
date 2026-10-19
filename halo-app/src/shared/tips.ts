@@ -8,7 +8,7 @@ import { briefCopy } from './brief-copy';
 import { formatClock } from './day';
 import { EARLY, nextMeal, roundGap, summaryPanel, SUGGESTIONS, type NextAction } from './insights';
 import { type Brief, rankSignals } from './pa';
-import { type InsightKind, isLate, type PaContext, type Signal } from './signals';
+import { type Insight, type InsightKind, isLate, type PaContext, type Signal } from './signals';
 import { type AreaKey, type VitalsReport, vitalsHeadline } from './vitals';
 
 export type TipArea = 'diet' | 'activity' | 'vitals';
@@ -23,6 +23,8 @@ export type Tip = {
   actionLabel: string | null;
   /** The PA signal it came from, so acting on it closes the loop like the brief does. */
   briefId: string | null;
+  /** That signal, worded (recorded as shown when the tip opens). */
+  insight: Insight | null;
   /** Vitals only: the area the step is about (its numbers are worded by the app, in the user's units). */
   focus: AreaKey | null;
 };
@@ -68,6 +70,7 @@ const fromSignal = (area: TipArea, s: Signal, ctx: PaContext): Tip => {
     action: s.action,
     actionLabel: s.action ? copy.actionLabel : null,
     briefId: s.id,
+    insight: { ...s, copy },
     focus: area === 'vitals' ? (FOCUS[s.type] ?? null) : null,
   };
 };
@@ -82,7 +85,7 @@ function pick(area: TipArea, ctx: PaContext, current: Brief | null): Signal | nu
 function dietTip(ctx: PaContext, current: Brief | null): Tip {
   const s = pick('diet', ctx, current);
   if (s) return fromSignal('diet', s, ctx);
-  const base = { area: 'diet' as const, briefId: null, focus: null, facts: dietFacts('calorie_pace', ctx) };
+  const base = { area: 'diet' as const, briefId: null, insight: null, focus: null, facts: dietFacts('calorie_pace', ctx) };
   if (isLate(ctx)) return { ...base, line: 'Done for today. Tomorrow starts fresh.', action: null, actionLabel: null };
   if (ctx.facts.mealsLogged === 0) {
     const { note, label } = SUGGESTIONS[nextMeal(ctx.hour, ctx.facts.loggedTypes)];
@@ -95,7 +98,7 @@ function dietTip(ctx: PaContext, current: Brief | null): Tip {
 function activityTip(ctx: PaContext): Tip {
   const f = ctx.facts;
   const panel = summaryPanel('activity', f);
-  const base = { area: 'activity' as const, briefId: null, focus: null };
+  const base = { area: 'activity' as const, briefId: null, insight: null, focus: null };
   if (f.steps == null) {
     return { ...base, line: 'No step data yet.', facts: null, action: panel.next.action, actionLabel: panel.next.text };
   }
@@ -112,7 +115,7 @@ function vitalsTip(ctx: PaContext, current: Brief | null, report: VitalsReport |
   const s = pick('vitals', ctx, current);
   if (s) return fromSignal('vitals', s, ctx);
   const { line, focus } = vitalsHeadline(report?.areas ?? []);
-  return { area: 'vitals', line, facts: null, action: null, actionLabel: null, briefId: null, focus };
+  return { area: 'vitals', line, facts: null, action: null, actionLabel: null, briefId: null, insight: null, focus };
 }
 
 /**

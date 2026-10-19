@@ -21,18 +21,10 @@ import { recordShown } from '@/assistant/loop-store';
 import { useBriefWords } from '@/assistant/phrasing';
 import { useDockInset } from '@/components/dock';
 import { HeroBackdrop } from '@/components/hero-backdrop';
-import {
-  DietIcon,
-  ExerciseIcon,
-  MoonIcon,
-  ShareIcon,
-  SunIcon,
-  VitalsIcon,
-} from '@/components/icons';
+import { MoonIcon, ShareIcon, SunIcon } from '@/components/icons';
 import { PressScale } from '@/components/press-scale';
 import { Reveal } from '@/components/reveal';
 import { ScoreArc, ScoreScrim } from '@/components/score-arc';
-import { ScoreChip } from '@/components/score-chip';
 import { ThemedScreen } from '@/components/themed-screen';
 import { refreshHealthData } from '@/lib/health-connect';
 import { setShareSnapshot } from '@/share/snapshot';
@@ -42,6 +34,7 @@ import { motion } from '@/theme/motion';
 import { useStatusBarStyle } from '@/theme/status-bar';
 import { ImageScope, useHaloTheme } from '@/theme/theme-provider';
 import { themes } from '@/theme/themes';
+import { TodayChips } from '@/today/chip-tips';
 import { briefCopy, todayCopy } from '@/today/copy';
 import { prefetchHeroes } from '@/today/prefetch';
 import { useMealCelebration } from '@/today/celebration';
@@ -190,25 +183,14 @@ export default function TodayScreen() {
 
           <Reveal
             index={1}
-            className="absolute inset-x-0 flex-row justify-center gap-5"
+            className="absolute inset-x-0"
             style={{ top: Math.max(CHIPS_AT * height, insets.top + 64) }}>
-            <ScoreChip
-              label="Diet"
-              value={scores.diet.value}
-              Icon={DietIcon}
+            <TodayChips
+              scores={scores}
+              scrollY={scrollY}
+              closeAt={height * 0.15}
               color={hero.colors.text}
-            />
-            <ScoreChip
-              label="Activity"
-              value={scores.activity.value}
-              Icon={ExerciseIcon}
-              color={hero.colors.text}
-            />
-            <ScoreChip
-              label="Vitals"
-              value={scores.vitals.value}
-              Icon={VitalsIcon}
-              color={hero.colors.text}
+              words={words}
             />
           </Reveal>
 
