@@ -4,7 +4,7 @@
 // on screen, then planDay's moments in the tray's own words), so the overlay never decides
 // anything; it shows the flag whose time has come, also while Halo is closed.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { useAssistant } from '@/assistant/assistant';
@@ -13,6 +13,8 @@ import { useBriefWords } from '@/assistant/phrasing';
 import { type InsightKind, type NextAction, planDay } from '@/shared';
 import { useHaloTheme } from '@/theme/theme-provider';
 import { useTodayScores } from '@/today/today-scores';
+
+import { useOverlayDrain } from './drain';
 
 import Overlay, {
   type OverlayFlag,
@@ -146,12 +148,20 @@ function build({
   };
 }
 
-/** Keeps the overlay's snapshot current and brings the overlay back on every open of Halo. */
+/**
+ * Keeps the overlay's snapshot current, brings the overlay back on every open of Halo, and puts what
+ * was logged on it into the store.
+ */
 export function OverlayPublisher() {
+  useOverlayDrain();
   const scores = useTodayScores();
   const { brief, context, phrase } = useAssistant();
   const words = useBriefWords(brief, phrase);
   const { theme, target } = useHaloTheme();
+
+  // The last snapshot written, and a bump that forces the next write.
+  const [epoch, setEpoch] = useState(0);
+  const written = useRef<string | null>(null);
 
   // Opening Halo (cold or from the background) brings back a ring that was dragged away.
   useEffect(() => {
@@ -161,7 +171,11 @@ export function OverlayPublisher() {
     };
     bringBack();
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') bringBack();
+      if (state !== 'active') return;
+      bringBack();
+      // Write afresh on every return, whatever the stored snapshot became meanwhile.
+      written.current = null;
+      setEpoch((e) => e + 1);
     });
     return () => sub.remove();
   }, []);
@@ -186,8 +200,8 @@ export function OverlayPublisher() {
     context.weighedToday,
     // The plan moves on with the clock too; a quarter hour is fine-grained enough.
     Math.floor(context.now / (15 * 60_000)),
+    epoch,
   ].join('|');
-  const written = useRef<string | null>(null);
   useEffect(() => {
     if (!Overlay) return;
     const timer = setTimeout(() => {

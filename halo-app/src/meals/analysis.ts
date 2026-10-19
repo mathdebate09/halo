@@ -13,6 +13,7 @@ import { AppState } from 'react-native';
 import { db } from '@/db/client';
 import { deleteRecord, upsertRecord } from '@/db/mutate';
 import { jobs, mealItems, meals } from '@/db/schema';
+import { kv } from '@/lib/kv';
 import {
   hourOfDay,
   type JobView,
@@ -21,6 +22,8 @@ import {
   mealAnalysisSchema,
 } from '@/shared';
 import { api, ApiError } from '@/sync/api';
+
+import { emitMealLogged } from './events';
 
 type Meal = typeof meals.$inferSelect;
 
@@ -52,6 +55,26 @@ function currentMeal(id: string): Meal | undefined {
     .get();
 }
 
+const AUTO_LOG_KEY = 'meals.autoLog';
+const autoLog = (): string[] => {
+  try {
+    return JSON.parse(kv.getString(AUTO_LOG_KEY) ?? '[]') as string[];
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * A meal the user already pressed Log on elsewhere (the overlay): once read, it's logged without
+ * the confirm step. One that can't be read stays a draft to fix, like any other.
+ */
+export function logOnceRead(mealId: string) {
+  kv.set(
+    AUTO_LOG_KEY,
+    JSON.stringify([...autoLog().filter((id) => id !== mealId), mealId].slice(-20)),
+  );
+}
+
 /** Writes an analysis as a draft (items + totals) for the confirm sheet. */
 function applyAnalysis(mealId: string, raw: unknown) {
   const meal = currentMeal(mealId);
@@ -73,8 +96,11 @@ function applyAnalysis(mealId: string, raw: unknown) {
   for (const item of items) upsertRecord('mealItem', { mealId, ...item });
   const sum = (key: 'kcal' | 'proteinG' | 'carbsG' | 'fatG') =>
     items.reduce((a, i) => a + i[key], 0);
+  const auto = autoLog().includes(mealId);
+  if (auto) kv.set(AUTO_LOG_KEY, JSON.stringify(autoLog().filter((id) => id !== mealId)));
+  const logged = auto && items.length > 0;
   patchMeal(meal, {
-    status: 'draft',
+    status: logged ? 'logged' : 'draft',
     title: analysis.title || null,
     kcal: sum('kcal'),
     proteinG: sum('proteinG'),
@@ -82,6 +108,7 @@ function applyAnalysis(mealId: string, raw: unknown) {
     fatG: sum('fatG'),
     confidence: items.length ? analysis.confidence : 0,
   });
+  if (logged) emitMealLogged();
 }
 
 function fail(mealId: string) {

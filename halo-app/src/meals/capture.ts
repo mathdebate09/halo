@@ -30,15 +30,22 @@ function mealsDirectory() {
 
 export type SavedMeal = { id: string; photoUri: string | null };
 
-/** Writes the meal now (photo, note or both); it shows as pending until analysed. */
+/**
+ * Writes the meal now (photo, note or both); it shows as pending until analysed. `id` and `at`
+ * come from a meal logged elsewhere (the overlay), so writing it twice can't log it twice.
+ */
 export function saveMeal({
   photoUri,
   note,
+  id: givenId,
+  at,
 }: {
   photoUri?: string | null;
   note?: string;
+  id?: string;
+  at?: number;
 }): SavedMeal {
-  const now = new Date();
+  const now = at != null ? new Date(at) : new Date();
   let kept: string | null = null;
   if (photoUri) {
     const source = new File(photoUri);
@@ -47,6 +54,7 @@ export function saveMeal({
     kept = target.uri;
   }
   const id = upsertRecord('meal', {
+    ...(givenId ? { id: givenId } : {}),
     day: dayKey(now),
     eatenAt: now.getTime(),
     mealType: mealTypeAt(hourOfDay(now), windowsOn(dayKey(now))),
