@@ -5,7 +5,7 @@
 // answers with one short line that is shown and spoken word for word. Actions come back for the
 // phone to apply to its own store (local-first): the server never writes the user's data.
 //
-//   POST /voice/turns  multipart { audio: WAV, body: VoiceTurnBody }  →  VoiceReply | VoiceFailure
+//   POST /voice/turns  VoiceTurnRequest (the body + a base64 WAV)   →  VoiceReply | VoiceFailure
 //   GET  /voice/speech/:id                                            →  PCM 24 kHz, 16-bit mono
 
 import { z } from 'zod';
@@ -54,6 +54,16 @@ export const voiceTurnBodySchema = z.object({
   flag: voiceFlagSchema.nullable(),
 });
 export type VoiceTurnBody = z.infer<typeof voiceTurnBodySchema>;
+
+/** The turn with its recording: a 16 kHz mono WAV as base64, like meal photos and report tiles. */
+export const voiceTurnRequestSchema = voiceTurnBodySchema.extend({
+  audio: z
+    .string()
+    .min(64)
+    .max(Math.ceil((VOICE_LIMITS.audioBytes * 4) / 3) + 4)
+    .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+});
+export type VoiceTurnRequest = z.infer<typeof voiceTurnRequestSchema>;
 
 // ── What it may do ───────────────────────────────────────────────────────────────
 

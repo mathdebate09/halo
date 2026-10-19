@@ -11,5 +11,7 @@ import { AdvisorTools } from './advisor.tools.js';
   imports: [MongooseModule.forFeature([{ name: AdvisorTurn.name, schema: AdvisorTurnSchema }]), MealsModule],
   controllers: [AdvisorController],
   providers: [AdvisorService, AdvisorTools],
+  // The voice turns read the snapshot with the same tools.
+  exports: [AdvisorTools],
 })
 export class AdvisorModule {}

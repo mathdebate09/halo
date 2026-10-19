@@ -5,7 +5,7 @@ NestJS + MongoDB. Sync for the app's local store, plus the slow AI work (meal ph
 ## Local
 
 ```bash
-cp .env.example .env          # MONGODB_URI, APP_KEY (same as EXPO_PUBLIC_APP_KEY), DEEPSEEK_API_KEY
+cp .env.example .env          # MONGODB_URI, APP_KEY (same as EXPO_PUBLIC_APP_KEY), DEEPSEEK_API_KEY, OPENAI_API_KEY (voice)
 docker start halo-mongo       # mongo:8 on 127.0.0.1:27017
 npm install
 npm run start:dev
@@ -19,7 +19,7 @@ Tests: `npm test` (unit) and `npm run test:e2e` (in-memory Mongo, a fake AI).
 `halo-backend/` deploys on its own: `src/shared` is a committed copy of halo-shared, and the `Procfile` runs `npm run start:prod` after Heroku's `npm run build`.
 
 1. Atlas: create a free cluster and a database user. Under Network Access allow `0.0.0.0/0` (Heroku dynos have no fixed IPs). Copy the `mongodb+srv://…` URI with a database name, e.g. `/halo`.
-2. Heroku app: create it, then set the config vars `MONGODB_URI` (`mongodb+srv://…/halo`), `APP_KEY` (16 chars, same as the app) and `DEEPSEEK_API_KEY`.
+2. Heroku app: create it, then set the config vars `MONGODB_URI` (`mongodb+srv://…/halo`), `APP_KEY` (16 chars, same as the app), `DEEPSEEK_API_KEY` and `OPENAI_API_KEY` (voice from the overlay).
 3. Deploy, either way:
    - **Dashboard (GitHub):** Settings → Config Vars: `APP_BASE=halo-backend`. Settings → Buildpacks: `https://github.com/lstoll/heroku-buildpack-monorepo` first, then `heroku/nodejs`. Deploy → GitHub → connect the repo → Deploy Branch `main` (or enable automatic deploys).
    - **CLI:** from the repo root,

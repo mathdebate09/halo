@@ -41,7 +41,8 @@ const quote = (s: string) => s.replace(/[<>]/g, (c) => (c === '<' ? '‹' : '›
 /** Whole numbers as people read them: 9,000 steps, 2,100 kcal. */
 const n = (v: number) => Math.round(v).toLocaleString('en-GB');
 
-function summary(ctx: AdvisorContext, entry: AdvisorEntry | null): string {
+/** The snapshot in a few lines, for the prompt's data block (the voice prompt uses it too). */
+export function summary(ctx: AdvisorContext, entry: AdvisorEntry | null): string {
   const { profile, plan, today, vitals, blood } = ctx;
   const lines: string[] = [];
   lines.push(`Now: ${today.day} ${today.clock}.${entry ? ` ${ENTRY[entry]}` : ''}`);

@@ -13,6 +13,7 @@ import {
   voiceProblem,
   voiceReplySchema,
   voiceTurnBodySchema,
+  voiceTurnRequestSchema,
 } from '../src/voice';
 import { BANNED } from '../src/phrase';
 
@@ -38,6 +39,16 @@ describe('turn body', () => {
     expect(voiceTurnBodySchema.safeParse(body({ threadId: 'today' })).success).toBe(false);
     const history = Array.from({ length: VOICE_LIMITS.history + 1 }, () => ({ role: 'user', content: 'hi' }));
     expect(voiceTurnBodySchema.safeParse(body({ history })).success).toBe(false);
+  });
+});
+
+describe('turn request', () => {
+  it('carries the recording as base64 within the size cap', () => {
+    const audio = Buffer.alloc(32_000).toString('base64');
+    expect(voiceTurnRequestSchema.safeParse({ ...body(), audio }).success).toBe(true);
+    expect(voiceTurnRequestSchema.safeParse({ ...body(), audio: 'not base64!' }).success).toBe(false);
+    const big = Buffer.alloc(VOICE_LIMITS.audioBytes + 3000).toString('base64');
+    expect(voiceTurnRequestSchema.safeParse({ ...body(), audio: big }).success).toBe(false);
   });
 });
 

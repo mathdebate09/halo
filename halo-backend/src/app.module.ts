@@ -16,6 +16,7 @@ import { LegalController } from './legal/legal.controller.js';
 import { MealsModule } from './meals/meals.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 import { SyncModule } from './sync/sync.module.js';
+import { VoiceModule } from './voice/voice.module.js';
 
 @Module({})
 export class AppModule {
@@ -36,6 +37,7 @@ export class AppModule {
         ReportsModule,
         InsightsModule,
         AdvisorModule,
+        VoiceModule,
       ],
       controllers: [HealthController, LegalController],
       providers: [

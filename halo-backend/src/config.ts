@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 
 import { z } from 'zod';
 
-import { ADVISOR_LIMITS, appKeySchema, REPORT_LIMITS } from './shared/index.js';
+import { ADVISOR_LIMITS, appKeySchema, REPORT_LIMITS, VOICE_LIMITS } from './shared/index.js';
 
 // Local dev reads halo-backend/.env (never committed); Heroku sets config vars directly.
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -30,6 +30,14 @@ const envSchema = z.object({
   /** An Advisor turn's whole budget (tool rounds and the answer), and the SSE heartbeat. */
   ADVISOR_TURN_MS: z.coerce.number().int().positive().default(ADVISOR_LIMITS.turnMs),
   ADVISOR_PING_MS: z.coerce.number().int().positive().default(15_000),
+  /** OpenAI, for voice only: speech to text and text to speech. Without it /voice answers 503. */
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_BASE_URL: z.url().default('https://api.openai.com/v1'),
+  OPENAI_STT_MODEL: z.string().min(1).default('gpt-4o-mini-transcribe'),
+  OPENAI_TTS_MODEL: z.string().min(1).default('gpt-4o-mini-tts'),
+  OPENAI_TTS_VOICE: z.string().min(1).default('marin'),
+  /** A voice turn's whole budget: transcription, tool rounds and the answer. */
+  VOICE_TURN_MS: z.coerce.number().int().positive().default(VOICE_LIMITS.turnMs),
 });
 
 export type Env = z.infer<typeof envSchema>;
