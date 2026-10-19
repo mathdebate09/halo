@@ -74,6 +74,11 @@ class OverlayModule : Module() {
       OverlayBus.service?.refresh()
     }
 
+    /** Chunk 27a spike: the next ring tap records 4 s and plays it back ("fgs" or "activity"). */
+    Function("armVoiceSpike") { mode: String -> OverlayStore.armVoiceSpike(context, mode) }
+
+    Function("voiceSpikeResult") { OverlayStore.voiceSpikeResult(context) }
+
     /** Everything logged on the overlay since the last call (a JSON array string); the queue empties. */
     Function("takeQueue") { OverlayStore.takeQueue(context) }
   }

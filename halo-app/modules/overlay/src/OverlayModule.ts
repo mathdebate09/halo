@@ -58,6 +58,9 @@ declare class OverlayModule extends NativeModule<Events> {
   stop(): void;
   isRunning(): boolean;
   setSnapshot(json: string): void;
+  /** Chunk 27a spike: the next ring tap records 4 s and plays it back. Missing before the rebuild. */
+  armVoiceSpike(mode: 'fgs' | 'activity'): void;
+  voiceSpikeResult(): string;
   /** Everything logged on the overlay since the last call (a JSON array string). */
   takeQueue(): string;
 }

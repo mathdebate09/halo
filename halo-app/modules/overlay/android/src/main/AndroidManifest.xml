@@ -3,17 +3,28 @@
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+  <!-- A voice log from the ring: the service takes the microphone type only while it records. -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
   <application>
     <service
       android:name="expo.modules.overlay.OverlayService"
       android:exported="false"
-      android:foregroundServiceType="specialUse">
+      android:foregroundServiceType="specialUse|microphone">
       <property
         android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
         android:value="Keeps the user's health scores and one prepared step on screen over other apps, at their request." />
     </service>
+    <!-- See-through and empty: shown for a moment so the mic may start while another app is in front. -->
+    <activity
+      android:name="expo.modules.overlay.VoiceActivity"
+      android:exported="false"
+      android:excludeFromRecents="true"
+      android:noHistory="true"
+      android:taskAffinity=""
+      android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     <!-- Back after a reboot or an update, unless the user dragged it away. -->
     <receiver
       android:name="expo.modules.overlay.BootReceiver"

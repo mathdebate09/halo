@@ -15,6 +15,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import {
   AppState,
   Modal,
+  PermissionsAndroid,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -449,6 +450,40 @@ function OverlayRow() {
   );
 }
 
+/** Chunk 27a spike: arm the ring, go to another app, tap the ring, speak for 4 s, hear it back. */
+function VoiceSpikeRow() {
+  const [note, setNote] = useState('');
+  if (!Overlay?.armVoiceSpike)
+    return <Row title="Voice spike" status="not in this build (rebuild)" />;
+  const overlay = Overlay;
+  return (
+    <Row title="Voice spike" status={note || overlay.voiceSpikeResult() || 'not run'}>
+      <Btn
+        label="Mic permission"
+        onPress={async () => {
+          const r = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+          setNote(`mic: ${r}`);
+        }}
+      />
+      <Btn
+        label="Arm (service)"
+        onPress={() => {
+          overlay.armVoiceSpike('fgs');
+          setNote('armed: service. Go home, tap the ring, speak.');
+        }}
+      />
+      <Btn
+        label="Arm (activity)"
+        onPress={() => {
+          overlay.armVoiceSpike('activity');
+          setNote('armed: activity. Go home, tap the ring, speak.');
+        }}
+      />
+      <Btn label="Read result" onPress={() => setNote(overlay.voiceSpikeResult())} />
+    </Row>
+  );
+}
+
 /** A critical reading laid over today's (never written to the store), to see vital_alert end to end. */
 function FakeReadingRow() {
   const [raw, setRaw] = useMMKVString(DEV_READING_KEY, kv);
@@ -710,6 +745,7 @@ export default function DevScreen() {
         <TodayRow />
         <FakeReadingRow />
         <OverlayRow />
+        <VoiceSpikeRow />
         <AssistantRow />
         <VitalsRow />
         <AdvisorRow />

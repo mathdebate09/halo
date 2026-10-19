@@ -1,5 +1,6 @@
 package expo.modules.overlay
 
+import android.Manifest
 import android.animation.ValueAnimator
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
@@ -12,14 +13,17 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -112,6 +116,8 @@ class OverlayService : Service() {
 
   // ── Foreground notification ────────────────────────────────────────────────────
 
+  private var notification: Notification? = null
+
   private fun startAsForeground() {
     val manager = getSystemService(NotificationManager::class.java)
     manager.createNotificationChannel(
@@ -128,6 +134,7 @@ class OverlayService : Service() {
       .setContentIntent(tap)
       .setOngoing(true)
       .build()
+    this.notification = notification
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
       startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
     } else {
@@ -199,7 +206,9 @@ class OverlayService : Service() {
           if (!dragging) {
             // With the pill out, a tap on the ring puts the pill away; otherwise it opens the card.
             if (e.actionMasked == MotionEvent.ACTION_UP) {
-              if (pill?.visibility == View.VISIBLE) dismissPill() else expand()
+              val spike = OverlayStore.takeVoiceSpike(this)
+              if (spike != null) runVoiceSpike(spike)
+              else if (pill?.visibility == View.VISIBLE) dismissPill() else expand()
             }
           } else {
             dragging = false
@@ -432,6 +441,111 @@ class OverlayService : Service() {
         startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
       }
     }
+  }
+
+  // ── The microphone ─────────────────────────────────────────────────────────────
+
+  /**
+   * Adds the microphone type to this service while a voice log records (Android 11+ needs the
+   * type for mic access from a foreground service). Null when it worked, else what went wrong.
+   */
+  fun beginMic(): String? {
+    if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return "no_permission"
+    val n = notification ?: return "no_notification"
+    return try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+      } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+      }
+      null
+    } catch (e: Exception) {
+      "${e.javaClass.simpleName}: ${e.message}"
+    }
+  }
+
+  /** Back to the overlay's own type once recording ends. */
+  fun endMic() {
+    val n = notification ?: return
+    runCatching {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+      } else {
+        startForeground(NOTIFICATION_ID, n)
+      }
+    }
+  }
+
+  // Chunk 27a spike: can the ring record while another app is in front, and play it back?
+  // "fgs" adds the mic type from the tap itself; "activity" first shows a see-through activity,
+  // which counts as Halo being visible. The result goes to the store and logcat (tag HaloVoice).
+  private var spikeLines = mutableListOf<String>()
+
+  private fun importance(): Int {
+    val info = ActivityManager.RunningAppProcessInfo()
+    ActivityManager.getMyMemoryState(info)
+    return info.importance
+  }
+
+  private fun runVoiceSpike(mode: String) {
+    spikeLines = mutableListOf("mode=$mode importance=${importance()} sdk=${Build.VERSION.SDK_INT}")
+    if (mode == "activity") {
+      val intent = Intent(this, VoiceActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+      runCatching { startActivity(intent) }.onFailure { spikeDone("activity failed: ${it.message}") }
+    } else {
+      spikeRecord()
+    }
+  }
+
+  /** Called by VoiceActivity while it's on screen. */
+  fun spikeFromActivity() {
+    spikeLines.add("activity importance=${importance()}")
+    spikeRecord()
+  }
+
+  private fun spikeRecord() {
+    val mic = beginMic()
+    spikeLines.add("beginMic=${mic ?: "ok"}")
+    if (mic != null) {
+      spikeDone(null)
+      return
+    }
+    bubble?.setBlinking(false)
+    val recorder = VoiceRecorder(object : VoiceRecorder.Listener {
+      override fun onLevel(level: Float) {}
+      override fun onDone(result: VoiceRecorder.Result) {
+        endMic()
+        spikeLines.add("recorded ${result.durationMs} ms, peak=${result.peak}, after 1 s=${result.laterPeak}, speech=${result.heardSpeech}, error=${result.error}")
+        val wav = result.wav
+        if (wav == null || result.laterPeak == 0) {
+          spikeDone(if (wav != null) "silenced (zeros after 1 s)" else "no audio")
+          return
+        }
+        spikeLines.add("maySpeak=${VoicePlayer.maySpeak(this@OverlayService)} onCall=${VoicePlayer.onCall(this@OverlayService)}")
+        Thread {
+          VoicePlayer(this@OverlayService).play(wav.inputStream(44, wav.size - 44), VoiceRecorder.RATE) { played ->
+            spikeDone("played back=$played")
+          }
+        }.start()
+      }
+    })
+    recorder.start(maxMs = 4_000, endOnSilence = false)
+    // Android marks a recording it silences (while-in-use denied) on its active configuration.
+    main.postDelayed({
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val audio = getSystemService(AudioManager::class.java)
+        val mine = audio.activeRecordingConfigurations
+        spikeLines.add("recordings=${mine.size} silenced=${mine.any { it.isClientSilenced }}")
+      }
+    }, 800)
+  }
+
+  private fun spikeDone(last: String?) {
+    last?.let { spikeLines.add(it) }
+    val text = spikeLines.joinToString("\n")
+    Log.i("HaloVoice", text.replace("\n", " | "))
+    OverlayStore.setVoiceSpikeResult(this, text)
+    render()
   }
 
   // ── Rendering ──────────────────────────────────────────────────────────────────
