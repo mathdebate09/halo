@@ -111,9 +111,13 @@ export function sleepPattern(nights: readonly NightShape[], targetBed: number): 
   const days = nights.filter((n) => !n.weekend).map(mid);
   const drift = ends.length >= 2 && days.length >= 2 ? Math.abs(median(ends)! - median(days)!) : 0;
   const target = targetBed < 12 ? targetBed + 24 : targetBed;
-  const tonight = Math.max(target, usualBed - STEP);
+  // A step back toward the target, never later than the usual bedtime (a late riser's target can
+  // sit after it).
+  const tonight = target < usualBed ? Math.max(target, usualBed - STEP) : usualBed - STEP;
+  // Late only when it's past both 00:30 and their own target: a late riser's 1 am isn't late.
+  const late = usualBed > LATE_BED && usualBed > target;
   const flag: SleepPattern['flag'] | null =
-    usualBed > LATE_BED ? 'late' : hours < SHORT_HOURS ? 'short' : drift > MAX_DRIFT ? 'drift' : null;
+    late ? 'late' : hours < SHORT_HOURS ? 'short' : drift > MAX_DRIFT ? 'drift' : null;
   if (!flag) return null;
   return { flag, usualBed, tonight, hours, drift };
 }

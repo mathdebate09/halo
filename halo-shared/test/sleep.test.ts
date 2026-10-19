@@ -64,6 +64,14 @@ describe('sleepPattern', () => {
   it('needs at least four nights', () => {
     expect(sleepPattern([night(26, 6), night(26, 6), night(26, 6)], 23)).toBeNull();
   });
+  it("doesn't call a late riser's 1 am late, and never steps later than the usual bedtime", () => {
+    // Up around 11: their own target is 3 am, so lights out at 1 am is early enough.
+    expect(sleepPattern([1, 2, 3, 4].map(() => night(25, 11)), 3)).toBeNull();
+    // Short nights for them still step earlier, not toward the later target.
+    const p = sleepPattern([1, 2, 3, 4].map(() => night(25, 6.5)), 3)!;
+    expect(p.flag).toBe('short');
+    expect(p.tonight).toBe(24.75);
+  });
 });
 
 function ctx(hh: number, mm: number, over: Partial<PaContext> = {}, f: Partial<DayFacts> = {}): PaContext {
