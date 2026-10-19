@@ -61,6 +61,19 @@ export function VitalsIcon(props: IconProps) {
   );
 }
 
+/** The halo mark (assets/brand/halo-mark.svg) on the 24 grid: a filled ring, not a line icon. */
+export function RingIcon({ size = 24, color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        fillRule="evenodd"
+        fill={color}
+        d="M4.51 12a7.49 3.05 0 1 0 14.98 0a7.49 3.05 0 1 0-14.98 0zM5.96 12.03a6.04 2.13 0 1 0 12.08 0a6.04 2.13 0 1 0-12.08 0z"
+      />
+    </Svg>
+  );
+}
+
 export function PlusIcon(props: IconProps) {
   return (
     <Line {...props}>

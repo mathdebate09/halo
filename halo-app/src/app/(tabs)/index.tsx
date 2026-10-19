@@ -37,6 +37,7 @@ import { TodayChips } from '@/today/chip-tips';
 import { briefCopy, todayCopy } from '@/today/copy';
 import { prefetchHeroes } from '@/today/prefetch';
 import { useMealCelebration } from '@/today/celebration';
+import { OverlayAskButton } from '@/overlay/ask-button';
 import { LearnMore } from '@/today/learn-more';
 import { useTodayScores } from '@/today/today-scores';
 
@@ -134,8 +135,11 @@ export default function TodayScreen() {
             index={0}
             className="absolute inset-x-0 flex-row items-center justify-between px-5"
             style={{ top: insets.top + 8 }}>
-            {/* As wide as the buttons on the right, so the wordmark stays centred. */}
-            <View className="h-11 w-[96px]" />
+            {/* As wide as the buttons on the right, so the wordmark stays centred. While the overlay
+                isn't allowed, its ask sits here. */}
+            <View className="h-11 w-[96px] flex-row items-center">
+              <OverlayAskButton color={hero.colors.text} />
+            </View>
             {/* Long-press the wordmark for the hidden developer screen (dev builds only). */}
             <Pressable
               onLongPress={__DEV__ ? () => router.push('/dev') : undefined}

@@ -6,12 +6,14 @@ import { ExerciseIcon, MoonIcon, ScaleIcon, VitalsIcon } from '@/components/icon
 import { connectHealthConnect, readAverageSteps, readBodyMeasurements } from '@/lib/health-connect';
 import { goNext, useStepFocus } from '@/onboarding/navigation';
 import { OnboardingScreen } from '@/onboarding/onboarding-screen';
+import { OverlayCard } from '@/onboarding/overlay-card';
 import { ScreenTimeCard } from '@/onboarding/screen-time-card';
 import { setAnswers } from '@/onboarding/state';
 import { useHaloTheme } from '@/theme/theme-provider';
 
 // scr 3: urge Health Connect, never block (SPEC §2 ▸). Imported values only prefill later steps.
-// Below it, the screen-time fallback for sleep (Usage access), optional like everything here.
+// Below it, the screen-time fallback for sleep (Usage access) and the floating overlay (Display over
+// other apps), optional like everything here.
 
 const IMPORTS = [
   { Icon: ScaleIcon, label: 'Weight and height', detail: 'Filled in for you' },
@@ -87,6 +89,7 @@ export default function HealthStep() {
         ))}
       </View>
       <ScreenTimeCard />
+      <OverlayCard />
       {notice ? (
         <Text
           accessibilityLiveRegion="polite"
