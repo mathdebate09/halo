@@ -15,7 +15,6 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { runAction } from '@/assistant/actions';
 import { useAssistant } from '@/assistant/assistant';
 import { recordShown } from '@/assistant/loop-store';
 import { useBriefWords } from '@/assistant/phrasing';
@@ -66,9 +65,6 @@ export default function TodayScreen() {
   const glow = useMealCelebration(scores, focused);
   const { brief, phrase } = useAssistant();
   const words = useBriefWords(brief, phrase);
-  // On-track days have no step: the tier's lines and Learn more speak for themselves.
-  const stepAction =
-    brief.insight.type !== 'on_track' && words.actionLabel ? brief.insight.action : null;
   // The tier's own words (the share card keeps these); the hero says what the PA brings.
   const tierCopy = todayCopy(target.tier, scores.day, hourOfDay(scores.now), scores.provisional);
   const copy = briefCopy(brief, words, tierCopy);
@@ -246,21 +242,6 @@ export default function TodayScreen() {
               </LayoutAnimationConfig>
             </Reveal>
             <Reveal index={4} className="items-center">
-              {/* The brief's prepared step, one tap away; Learn more steps back to a link. */}
-              {stepAction ? (
-                <Animated.View
-                  key={`step:${briefId}`}
-                  entering={FadeIn.duration(400).easing(motion.calm)}>
-                  <PressScale
-                    accessibilityRole="button"
-                    onPress={() => runAction(stepAction, briefId)}
-                    className="mt-7 rounded-pill bg-text px-8 py-3.5">
-                    <Text className="font-sans-medium text-[16px] text-bg">
-                      {words.actionLabel}
-                    </Text>
-                  </PressScale>
-                </Animated.View>
-              ) : null}
               <PressScale
                 accessibilityRole="button"
                 onPress={() => {
@@ -270,13 +251,8 @@ export default function TodayScreen() {
                     animated: true,
                   });
                 }}
-                className={
-                  stepAction ? 'mt-2 px-6 py-3' : 'mt-7 rounded-pill bg-glass/10 px-8 py-3.5'
-                }>
-                <Text
-                  className={`font-sans-medium text-[16px] ${stepAction ? 'text-text/80' : 'text-text'}`}>
-                  Learn more
-                </Text>
+                className="mt-7 rounded-pill bg-glass/10 px-8 py-3.5">
+                <Text className="font-sans-medium text-[16px] text-text">Learn more</Text>
               </PressScale>
             </Reveal>
           </View>
