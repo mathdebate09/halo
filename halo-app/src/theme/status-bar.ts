@@ -18,7 +18,8 @@ const NAV_STYLE = { dark: 'light', light: 'dark', auto: 'auto', inverted: 'inver
 const apply = () => {
   const style = overrides.at(-1)?.style ?? base;
   setStatusBarStyle(style, true);
-  NavigationBar.setStyle(NAV_STYLE[style]);
+  // The overlay keeps Halo's JS alive after its screen is swiped away: no bar to style then.
+  Promise.resolve(NavigationBar.setStyle(NAV_STYLE[style])).catch(() => {});
 };
 
 export function setStatusBarMode(mode: Mode) {
