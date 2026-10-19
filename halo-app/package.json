@@ -1,7 +1,7 @@
 {
   "name": "halo-app",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "dependencies": {
     "@expo-google-fonts/anton": "^0.4.2",
     "@expo-google-fonts/caveat": "^0.4.2",
