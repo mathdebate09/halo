@@ -74,6 +74,9 @@ class OverlayModule : Module() {
       OverlayBus.service?.refresh()
     }
 
+    /** What a voice turn from the ring needs (consent, backend, today's snapshot), as JSON. */
+    Function("setVoice") { json: String -> OverlayStore.setVoice(context, json) }
+
     /** Chunk 27a spike: the next ring tap records 4 s and plays it back ("fgs" or "activity"). */
     Function("armVoiceSpike") { mode: String -> OverlayStore.armVoiceSpike(context, mode) }
 

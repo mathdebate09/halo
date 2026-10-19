@@ -81,6 +81,7 @@ import {
   reportPageSchema,
   tidyPage,
 } from '@/shared';
+import { applyQueued } from '@/overlay/drain';
 import {
   discard,
   pageCount,
@@ -450,6 +451,12 @@ function OverlayRow() {
   );
 }
 
+/** Fixed ids so the fake voice turn can be undone and cleaned up. */
+const FAKE_VOICE = {
+  water: 'f0a1e000-0000-4000-8000-000000000027',
+  turn: 'f0a1e000-0000-4000-8000-000000000127',
+};
+
 /** Chunk 27a spike: arm the ring, go to another app, tap the ring, speak for 4 s, hear it back. */
 function VoiceSpikeRow() {
   const [note, setNote] = useState('');
@@ -480,6 +487,41 @@ function VoiceSpikeRow() {
         }}
       />
       <Btn label="Read result" onPress={() => setNote(overlay.voiceSpikeResult())} />
+      <Btn
+        label="Fake voice water"
+        onPress={() => {
+          const at = Date.now();
+          applyQueued([
+            { kind: 'water', ml: 250, clientId: FAKE_VOICE.water, at },
+            {
+              kind: 'voice_turn',
+              clientId: randomUUID(),
+              at,
+              turnId: FAKE_VOICE.turn,
+              threadId: dayKey(new Date()),
+              heard: 'Add a glass of water.',
+              reply: 'Added 250 ml.',
+              logs: [{ clientId: FAKE_VOICE.water, kind: 'water' }],
+            },
+          ]);
+          setNote('fake voice water applied (check Today and the Advisor)');
+        }}
+      />
+      <Btn
+        label="Undo + clean up"
+        onPress={() => {
+          applyQueued([
+            { kind: 'undo', targetId: FAKE_VOICE.water, clientId: randomUUID(), at: Date.now() },
+          ]);
+          const rows = db
+            .select({ id: advisorMessages.id })
+            .from(advisorMessages)
+            .where(eq(advisorMessages.turnId, FAKE_VOICE.turn))
+            .all();
+          for (const r of rows) deleteRecord('advisorMessage', r.id);
+          setNote(`undone; ${rows.length} thread rows removed`);
+        }}
+      />
     </Row>
   );
 }

@@ -8,12 +8,13 @@ import { goNext, useStepFocus } from '@/onboarding/navigation';
 import { OnboardingScreen } from '@/onboarding/onboarding-screen';
 import { OverlayCard } from '@/onboarding/overlay-card';
 import { ScreenTimeCard } from '@/onboarding/screen-time-card';
+import { VoiceCard } from '@/voice/voice-card';
 import { setAnswers } from '@/onboarding/state';
 import { useHaloTheme } from '@/theme/theme-provider';
 
 // scr 3: urge Health Connect, never block (SPEC §2 ▸). Imported values only prefill later steps.
-// Below it, the screen-time fallback for sleep (Usage access) and the floating overlay (Display over
-// other apps), optional like everything here.
+// Below it, the screen-time fallback for sleep (Usage access), the floating overlay (Display over
+// other apps) and talking to it (voice), optional like everything here.
 
 const IMPORTS = [
   { Icon: ScaleIcon, label: 'Weight and height', detail: 'Filled in for you' },
@@ -90,6 +91,7 @@ export default function HealthStep() {
       </View>
       <ScreenTimeCard />
       <OverlayCard />
+      <VoiceCard />
       {notice ? (
         <Text
           accessibilityLiveRegion="polite"

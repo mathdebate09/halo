@@ -6,7 +6,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import { windowsOn } from '@/assistant/learned';
 import { upsertRecord } from '@/db/mutate';
-import { dayKey, hourOfDay, mealTypeAt } from '@/shared';
+import { dayKey, hourOfDay, type MealType, mealTypeAt } from '@/shared';
 
 import { requestAnalysis } from './analysis';
 
@@ -39,11 +39,14 @@ export function saveMeal({
   note,
   id: givenId,
   at,
+  mealType,
 }: {
   photoUri?: string | null;
   note?: string;
   id?: string;
   at?: number;
+  /** As said ("for lunch"); else from the time and the learned windows. */
+  mealType?: MealType | null;
 }): SavedMeal {
   const now = at != null ? new Date(at) : new Date();
   let kept: string | null = null;
@@ -57,7 +60,7 @@ export function saveMeal({
     ...(givenId ? { id: givenId } : {}),
     day: dayKey(now),
     eatenAt: now.getTime(),
-    mealType: mealTypeAt(hourOfDay(now), windowsOn(dayKey(now))),
+    mealType: mealType ?? mealTypeAt(hourOfDay(now), windowsOn(dayKey(now))),
     source: kept ? 'photo' : 'text',
     note: note?.trim() || null,
     photoUri: kept,

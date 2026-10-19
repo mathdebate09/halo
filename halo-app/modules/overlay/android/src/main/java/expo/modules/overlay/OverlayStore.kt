@@ -17,6 +17,15 @@ object OverlayStore {
 
   fun setSnapshot(c: Context, json: String) = prefs(c).edit().putString("snapshot", json).apply()
 
+  /**
+   * What a voice turn needs while Halo's JS may not be running: whether the user agreed, the
+   * backend and its headers, today's thread and the Advisor snapshot (chunk 27d).
+   */
+  fun voice(c: Context): JSONObject? =
+    prefs(c).getString("voice", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
+
+  fun setVoice(c: Context, json: String) = prefs(c).edit().putString("voice", json).apply()
+
   /** Dragged to the ×: stays away until Halo opens again. */
   fun closed(c: Context) = prefs(c).getBoolean("closed", false)
   fun setClosed(c: Context, value: Boolean) = prefs(c).edit().putBoolean("closed", value).apply()

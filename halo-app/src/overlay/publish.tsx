@@ -14,6 +14,8 @@ import { type InsightKind, type NextAction, planDay } from '@/shared';
 import { useHaloTheme } from '@/theme/theme-provider';
 import { useTodayScores } from '@/today/today-scores';
 
+import { useVoicePublisher } from '@/voice/publish';
+
 import { useOverlayDrain } from './drain';
 
 import Overlay, {
@@ -149,8 +151,8 @@ function build({
 }
 
 /**
- * Keeps the overlay's snapshot current, brings the overlay back on every open of Halo, and puts what
- * was logged on it into the store.
+ * Keeps the overlay's snapshot (and its voice payload) current, brings the overlay back on every open
+ * of Halo, and puts what was logged on it into the store.
  */
 export function OverlayPublisher() {
   useOverlayDrain();
@@ -213,6 +215,8 @@ export function OverlayPublisher() {
     }, 1000);
     return () => clearTimeout(timer);
   }, [trigger]);
+  // What the ring needs to talk, on the same beat.
+  useVoicePublisher(trigger);
 
   return null;
 }

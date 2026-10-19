@@ -42,8 +42,40 @@ export type OverlaySnapshot = {
 
 /** Something logged on the overlay, waiting for the app to put it in the store. */
 export type OverlayQueued = { clientId: string; at: number; briefId?: string } & (
-  { kind: 'meal_text'; text: string } | { kind: 'water'; ml: number } | { kind: 'acted' }
+  | {
+      kind: 'meal_text';
+      text: string;
+      mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack' | null;
+    }
+  | { kind: 'water'; ml: number }
+  | { kind: 'weight'; kg: number }
+  | { kind: 'acted' }
+  /** Takes back an earlier entry (by its client id): a voice reply's Undo. */
+  | { kind: 'undo'; targetId: string }
+  /** A voice exchange for today's Advisor thread; `logs` are the client ids it wrote. */
+  | {
+      kind: 'voice_turn';
+      turnId: string;
+      threadId: string;
+      heard: string;
+      reply: string;
+      logs: { clientId: string; kind: 'meal_text' | 'water' | 'weight' }[];
+    }
 );
+
+/** What the ring needs for a voice turn while Halo's JS may not be running. */
+export type OverlayVoice = {
+  v: 1;
+  /** The user agreed (onboarding or the Today ask) and the mic is allowed. */
+  allowed: boolean;
+  api: { url: string; headers: Record<string, string> };
+  /** Today's Advisor thread, and the snapshot the turn carries (null before a plan exists). */
+  threadId: string;
+  context: unknown | null;
+  history: { role: 'user' | 'assistant'; content: string }[];
+  /** Epoch ms when it was written (the ring sends no snapshot from an earlier day). */
+  at: number;
+};
 
 type Events = { onQueued: () => void };
 
@@ -58,6 +90,8 @@ declare class OverlayModule extends NativeModule<Events> {
   stop(): void;
   isRunning(): boolean;
   setSnapshot(json: string): void;
+  /** What a voice turn needs (an OverlayVoice as JSON). Missing before the 27d rebuild. */
+  setVoice(json: string): void;
   /** Chunk 27a spike: the next ring tap records 4 s and plays it back. Missing before the rebuild. */
   armVoiceSpike(mode: 'fgs' | 'activity'): void;
   voiceSpikeResult(): string;

@@ -85,7 +85,7 @@ function setCard(message: AdvisorMessage, card: StoredCard) {
 }
 
 /** Today's weigh-in, kept to one a day like the weigh-in sheet. */
-function saveWeight(kg: number): { id: string; prev: StoredCard['prev'] } {
+export function saveWeight(kg: number): { id: string; prev: StoredCard['prev'] } {
   const now = new Date();
   const day = dayKey(now);
   const existing = db
