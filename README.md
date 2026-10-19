@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
- <a href="https://github.com/mathdebate09/halo/releases/download/v1.0.0/halo-v1.0.0-arm64-v8a.apk">
+ <a href="https://github.com/mathdebate09/halo/releases/download/v1.1.0/halo-v1.1.0-arm64-v8a.apk">
   <img src="https://ik.imagekit.io/jayowiee/badges/download-apk.png" alt="download APK" height="48" />
  </a>
  <a href="https://github.com/mathdebate09/halo/releases/latest" style="margin-left: 10px;">
@@ -30,6 +30,7 @@
 2. **One goal, with a clear what and why:** onboarding ends in a target and a date. Today says what to do next, and Learn more says why.
 3. **Lab reports tied to that goal:** a PDF becomes Vitals readings and one step to take, not a list of flags.
 4. **An assistant that does the work:** Halo picks what's worth saying and when, acts in one tap, and checks the next morning whether it worked. The Advisor answers when you ask.
+5. **Halo over other apps:** a floating ring keeps your score on screen, and a pill slides out when something is due ("Catch up on water"). Tap the ring and say it: "had two rotis and dal" is logged, "how am I doing on protein" is answered, out loud and in one line.
 
 **Left out on purpose:**
 - Login and a profile screen: the phone is the store, and progress lives on Today.
@@ -157,6 +158,7 @@ flowchart LR
     Engine["halo-shared<br/>plan · scores · PA engine"]
     Outbox["Outbox +<br/>sync worker"]
     Native["Local modules<br/>PDF · speech · screen time"]
+    Ring["Floating ring<br/>(overlay service)"]
     HC["Health Connect"]
     Notif["Scheduled<br/>notifications"]
   end
@@ -166,12 +168,16 @@ flowchart LR
   end
   Atlas[("MongoDB Atlas")]
   DS["DeepSeek<br/>(flash model)"]
+  OAI["OpenAI<br/>(speech in and out)"]
 
   UI <--> Store
   Engine --> UI
   Store --> Engine
   HC --> Store
   Native --> UI
+  Store -->|"snapshot"| Ring
+  Ring -->|"queued logs"| Store
+  Ring -->|"voice turns"| API
   Engine --> Notif
   Store --> Outbox
   Outbox <-->|"push / pull"| API
@@ -180,7 +186,8 @@ flowchart LR
   API <--> Atlas
   Jobs <--> Atlas
   API --> DS
+  API --> OAI
   Jobs --> DS
 ```
 
-The UI reads only from the phone. Plans, scores and briefs are computed there by `halo-shared`. The backend syncs records and runs the AI calls. More in [ARCHITECTURE.md](ARCHITECTURE.md).
+The UI reads only from the phone. Plans, scores and briefs are computed there by `halo-shared`. The backend syncs records and runs the AI calls; OpenAI only turns speech into words and back. More in [ARCHITECTURE.md](ARCHITECTURE.md).

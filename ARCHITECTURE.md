@@ -61,6 +61,30 @@ sequenceDiagram
   Note over App,API: no stream? 202 + GET /advisor/turns/:id
 ```
 
+### Voice: the floating ring
+
+```mermaid
+sequenceDiagram
+  participant Ring as Ring (overlay service, Kotlin)
+  participant API as POST /voice/turns
+  participant OAI as OpenAI
+  participant AI as DeepSeek
+  participant App as Halo (JS, when running)
+  Ring->>Ring: tap → mic (foreground only while recording), stops on silence
+  Ring->>API: WAV + the snapshot Halo last wrote + today's thread
+  API->>OAI: speech to text (gpt-4o-mini-transcribe)
+  API->>AI: the Advisor's tools over the snapshot + tools that log or open
+  AI-->>API: actions + one short line (guarded; no claim without its action)
+  API-->>Ring: line + actions + speech id
+  Ring->>Ring: show the line, queue the logs, notify with Undo
+  Ring->>API: GET /voice/speech/:id
+  API->>OAI: text to speech (gpt-4o-mini-tts, PCM stream)
+  API-->>Ring: audio as it's made → played with music ducked
+  Ring-->>App: queue drained into SQLite + outbox (at once, or on next open)
+```
+
+The ring works while Halo's JS isn't running: Halo keeps a snapshot, the backend address and consent in the overlay's store, and the ring's logs wait in a queue. Halo keeps neither the audio nor a transcript on the server.
+
 ### PDFs: rendered on the phone
 
 ```mermaid
@@ -82,16 +106,17 @@ flowchart LR
   - `loop` checks the outcome the next morning.
   - The AI only rewords a brief.
 - **Missing data:** measured → inferred → assumed → hidden, with each value labelled by its source.
-- **Local modules (Kotlin):** `pdf-renderer`, `speech` (on-device dictation) and `screen-time` (sleep inference).
+- **Local modules (Kotlin):** `pdf-renderer`, `speech` (on-device dictation), `screen-time` (sleep inference) and `overlay` (the floating ring: score, nudge pill, card, voice).
 - **Theme:** nine photo-derived tier themes, light by default with a dark switch.
 
 ## Backend architecture
 
-- **Modules:** `device`, `sync`, `meals`, `reports`, `jobs`, `insights`, `advisor`, `ai`, `health`, `legal`.
+- **Modules:** `device`, `sync`, `meals`, `reports`, `jobs`, `insights`, `advisor`, `voice`, `ai`, `health`, `legal`.
 - **`AiService`:** the only code that talks to DeepSeek. It adds a timeout, one retry, Zod-checked JSON and a template fallback, and calls use `reasoning_effort: 'none'`.
+- **`OpenAiService`:** speech only, for voice from the ring: transcription and a calm text-to-speech voice. About $0.003 per voice log.
 - **Auth:** a shared app key (`x-app-key`) for access, a per-install UUID (`x-device-id`) for identity. Rate limits and job caps apply per device.
 - **Advisor guard:** drops internal scores, goal lists and promises of a card that doesn't exist.
-- **Tests:** Vitest unit tests and 33 end-to-end tests (in-memory Mongo, fake AI).
+- **Tests:** Vitest unit tests and 66 end-to-end tests (in-memory Mongo, fake AI and speech).
 
 ## Edge cases handled
 
@@ -101,6 +126,7 @@ flowchart LR
 - **Reports:** locked PDFs, scans, more than 12 pages, mixed units, values like "<0.5", several dates in one report, the same report added twice. Names and IDs are scrubbed.
 - **Time:** the day runs past midnight, and clock format follows the phone.
 - **Safety:** red-flag questions get emergency numbers, and nothing is diagnostic.
+- **Voice:** offline or on a call the ring says so without recording; Do Not Disturb keeps the reply silent; silence is caught on the phone and on the server; a reply never says something was logged unless it was, and every log has Undo on its notification.
 - **Abuse:** rate limits, job caps, daily page limits, request size limits.
 
 ## Run it yourself
@@ -114,7 +140,7 @@ flowchart LR
 
 ```bash
 # backend
-cd halo-backend && cp .env.example .env   # MONGODB_URI, APP_KEY (16 chars), DEEPSEEK_API_KEY
+cd halo-backend && cp .env.example .env   # MONGODB_URI, APP_KEY (16 chars), DEEPSEEK_API_KEY, OPENAI_API_KEY (voice)
 docker run -d --name halo-mongo -p 127.0.0.1:27017:27017 mongo:8
 npm install && npm run start:dev
 adb reverse tcp:3000 tcp:3000
