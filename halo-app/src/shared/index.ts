@@ -18,5 +18,6 @@ export * from './scoring';
 export * from './signals';
 export * from './sleep';
 export * from './sync';
+export * from './tips';
 export * from './units';
 export * from './vitals';
