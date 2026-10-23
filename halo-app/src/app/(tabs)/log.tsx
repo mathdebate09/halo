@@ -1,61 +1,25 @@
-import { and, asc, desc, eq, gte, inArray, isNull } from 'drizzle-orm';
-import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
-import { type ComponentType, useEffect, useState } from 'react';
-import {
-  Keyboard,
-  KeyboardAvoidingView,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import Animated, {
-  Easing,
-  FadeIn,
-  FadeOut,
-  LinearTransition,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withDelay,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
+import { useEffect, useState } from 'react';
+import { Keyboard, KeyboardAvoidingView, Pressable, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  ArrowUpIcon,
-  ChatIcon,
-  CloseIcon,
-  HistoryIcon,
-  RunIcon,
-  ScaleIcon,
-  WaterIcon,
-} from '@/components/icons';
-import { MicButton } from '@/components/mic-button';
-import { PressScale } from '@/components/press-scale';
-import { Sheet } from '@/components/sheet';
+import { CloseIcon } from '@/components/icons';
 import { setToastLift } from '@/components/toast';
 import { ThemedScreen } from '@/components/themed-screen';
-import { db } from '@/db/client';
-import { mealItems, meals } from '@/db/schema';
-import { addWater, DEFAULT_GLASS_ML } from '@/lib/water';
-import { useDictation } from '@/lib/dictation';
 import { reanalyse } from '@/meals/analysis';
+import { AnalysingCard } from '@/meals/analysing-card';
 import { saveMeal } from '@/meals/capture';
+import { LoggerActions } from '@/meals/logger-actions';
 import { MealCamera } from '@/meals/meal-camera';
+import { NoteBar } from '@/meals/note-bar';
 import { ResultSection } from '@/meals/result-section';
-import { ScanLoader } from '@/meals/scan-loader';
+import { useActiveMeal } from '@/meals/use-active-meal';
+import { WaterSheet } from '@/meals/water-sheet';
 import { useHaloTheme } from '@/theme/theme-provider';
 import { useMealReaction } from '@/today/celebration';
 import { useTodayScores } from '@/today/today-scores';
-import { tierGradients } from '@/theme/themes';
 
 // The Meal Logger section (the dock's plus). One card does the whole flow in place: the camera,
 // then the sent photo under the AI loader, then the analysis as an editable section with Log and
@@ -63,45 +27,20 @@ import { tierGradients } from '@/theme/themes';
 // correction that re-runs the analysis.
 
 const CARD_RADIUS = 44;
-const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-const WATER_PRESETS = [150, 250, 330, 500];
-/** A pending meal this recent is picked back up when the logger opens. */
-const RESUME_WITHIN_MS = 12 * 3600 * 1000;
-
-type Mode = 'capture' | 'analysing' | 'result';
 
 export default function MealLogger() {
   const insets = useSafeAreaInsets();
   const { theme } = useHaloTheme();
   const focused = useIsFocused();
-  const params = useLocalSearchParams<{ meal?: string; note?: string }>();
+  const params = useLocalSearchParams<{ note?: string }>();
   const { reaction, reset: resetReaction } = useMealReaction(useTodayScores());
+  const { activeId, setActiveId, meal, items, mode } = useActiveMeal(focused);
 
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [capture, setCapture] = useState(0); // remounts the camera after each round
   const [card, setCard] = useState({ width: 0, height: 0 });
   const [waterSheet, setWaterSheet] = useState(false);
-  const [customMl, setCustomMl] = useState('');
-
-  const { data: activeRows } = useLiveQuery(
-    db
-      .select()
-      .from(meals)
-      .where(and(eq(meals.id, activeId ?? ''), isNull(meals.deletedAt))),
-    [activeId],
-  );
-  const { data: items } = useLiveQuery(
-    db
-      .select()
-      .from(mealItems)
-      .where(and(eq(mealItems.mealId, activeId ?? ''), isNull(mealItems.deletedAt)))
-      .orderBy(asc(mealItems.createdAt)),
-    [activeId],
-  );
-  const meal = activeId ? activeRows[0] : undefined;
-  const mode: Mode = !meal ? 'capture' : meal.status === 'analysing' ? 'analysing' : 'result';
 
   // Leaving the logger resets the camera card to its blurred "Meal Logger" face: coming back
   // asks for a tap again instead of opening straight into a live viewfinder. A photo already
@@ -122,32 +61,6 @@ export default function MealLogger() {
     if (!activeId) setNote(params.note);
     router.setParams({ note: undefined });
   }, [params.note, activeId]);
-
-  // Opened from Today's card: show that meal in the card.
-  useEffect(() => {
-    if (!params.meal) return;
-    setActiveId(params.meal);
-    router.setParams({ meal: undefined });
-  }, [params.meal]);
-
-  // Coming back to the logger with a meal still in flight (or waiting for review): resume it.
-  useEffect(() => {
-    if (!focused || activeId) return;
-    const pending = db
-      .select({ id: meals.id })
-      .from(meals)
-      .where(
-        and(
-          inArray(meals.status, ['analysing', 'draft', 'failed']),
-          isNull(meals.deletedAt),
-          gte(meals.createdAt, Date.now() - RESUME_WITHIN_MS),
-        ),
-      )
-      .orderBy(desc(meals.createdAt))
-      .limit(1)
-      .get();
-    if (pending) setActiveId(pending.id);
-  }, [focused, activeId]);
 
   const canSend = mode === 'capture' ? !!photo || note.trim().length > 0 : note.trim().length > 0;
 
@@ -170,16 +83,6 @@ export default function MealLogger() {
     setActiveId(null);
     setCapture((c) => c + 1);
   };
-
-  const custom = Number(customMl);
-  const customValid = Number.isFinite(custom) && custom >= 50 && custom <= 2000;
-  const addCustom = (ml: number) => {
-    setWaterSheet(false);
-    setCustomMl('');
-    addWater(ml);
-  };
-
-  const [top, mid, bottom] = tierGradients[theme.tier];
 
   return (
     <ThemedScreen>
@@ -214,29 +117,7 @@ export default function MealLogger() {
             ) : null}
 
             {mode === 'analysing' && meal ? (
-              <View
-                className="flex-1 overflow-hidden border border-hairline/10"
-                style={{ borderRadius: CARD_RADIUS }}>
-                {meal.photoUri ? (
-                  <Image
-                    source={{ uri: meal.photoUri }}
-                    contentFit="cover"
-                    style={StyleSheet.absoluteFill}
-                  />
-                ) : (
-                  <>
-                    <LinearGradient colors={[top, mid, bottom]} style={StyleSheet.absoluteFill} />
-                    <View className="flex-1 items-center justify-center px-8">
-                      <Text
-                        numberOfLines={5}
-                        className="text-center font-serif text-[30px] leading-[36px] text-text">
-                        “{meal.note}”
-                      </Text>
-                    </View>
-                  </>
-                )}
-                <ScanLoader radius={CARD_RADIUS} />
-              </View>
+              <AnalysingCard meal={meal} radius={CARD_RADIUS} />
             ) : null}
 
             {mode === 'result' && meal && card.width > 0 ? (
@@ -255,225 +136,11 @@ export default function MealLogger() {
           <NoteBar mode={mode} note={note} onChangeNote={setNote} canSend={canSend} onSend={send} />
         </KeyboardAvoidingView>
 
-        <View className="mt-4 flex-row justify-between">
-          <Action label="History" Icon={HistoryIcon} onPress={() => router.navigate('/history')} />
-          <Action
-            label="Water"
-            Icon={WaterIcon}
-            onPress={() => addWater()}
-            onLongPress={() => setWaterSheet(true)}
-          />
-          <Action label="Weigh-in" Icon={ScaleIcon} onPress={() => router.push('/weigh-in')} />
-          <Action
-            label="Advisor"
-            Icon={ChatIcon}
-            // A note already typed here goes along as the question.
-            onPress={() =>
-              router.push({
-                pathname: '/advisor',
-                params: { from: 'plus', ...(note.trim() ? { note: note.trim() } : {}) },
-              })
-            }
-          />
-          <Action label="Workout" Icon={RunIcon} onPress={() => router.navigate('/exercise')} />
-        </View>
+        <LoggerActions note={note} onWaterMore={() => setWaterSheet(true)} />
       </View>
 
-      <Sheet
-        visible={waterSheet}
-        onClose={() => setWaterSheet(false)}
-        accessibilityLabel="Add water">
-        <Text className="font-serif text-[32px] text-text">Water</Text>
-        <View className="mt-5 flex-row gap-2">
-          {WATER_PRESETS.map((ml) => (
-            <PressScale
-              key={ml}
-              accessibilityRole="button"
-              onPress={() => addCustom(ml)}
-              pressableStyle={styles.fill}
-              className={`items-center rounded-pill py-3 ${ml === DEFAULT_GLASS_ML ? 'bg-glass/20' : 'bg-glass/10'}`}>
-              <Text className="font-sans-medium text-[15px] text-text">{ml} ml</Text>
-            </PressScale>
-          ))}
-        </View>
-        <View className="mt-3 flex-row items-center rounded-pill border border-hairline/10 bg-glass/10 py-1.5 pl-5 pr-1.5">
-          <TextInput
-            value={customMl}
-            onChangeText={(t) => setCustomMl(t.replace(/[^0-9]/g, ''))}
-            placeholder="Other amount"
-            placeholderTextColor={theme.colors.muted}
-            keyboardType="number-pad"
-            maxLength={4}
-            className="flex-1 py-2 font-sans text-[16px] text-text"
-            accessibilityLabel="Water in millilitres"
-          />
-          <Text className="mr-3 font-sans text-[15px] text-muted">ml</Text>
-          <PressScale
-            accessibilityRole="button"
-            accessibilityLabel="Add"
-            disabled={!customValid}
-            onPress={() => addCustom(custom)}
-            className={`rounded-pill bg-text px-5 py-2.5 ${customValid ? '' : 'opacity-30'}`}>
-            <Text className="font-sans-medium text-[15px] text-bg">Add</Text>
-          </PressScale>
-        </View>
-      </Sheet>
+      <WaterSheet visible={waterSheet} onClose={() => setWaterSheet(false)} />
     </ThemedScreen>
-  );
-}
-
-/**
- * The note bar under the card. While the AI works it converges into a small "Analysing" pill
- * (a layout transition), then opens back up as the place to ask for a correction.
- */
-function NoteBar({
-  mode,
-  note,
-  onChangeNote,
-  canSend,
-  onSend,
-}: {
-  mode: Mode;
-  note: string;
-  onChangeNote: (note: string) => void;
-  canSend: boolean;
-  onSend: () => void;
-}) {
-  const { theme } = useHaloTheme();
-  const analysing = mode === 'analysing';
-  // Speaking the note (on the phone): the words land in the field, then Send as usual.
-  const dictation = useDictation(note, onChangeNote);
-  const send = () => {
-    dictation.cancel();
-    onSend();
-  };
-  return (
-    <Animated.View
-      layout={LinearTransition.duration(450).easing(EASE_OUT)}
-      className={`mt-4 min-h-[56px] flex-row items-center rounded-[28px] border border-hairline/10 bg-glass/10 ${analysing ? 'self-center px-6' : 'self-stretch py-1.5 pl-5 pr-1.5'}`}>
-      {analysing ? (
-        <Animated.View
-          key="analysing"
-          entering={FadeIn.duration(300).delay(200)}
-          exiting={FadeOut.duration(150)}
-          accessibilityLiveRegion="polite"
-          className="flex-row items-center">
-          <Text className="font-sans-medium text-[16px] text-text">Analysing</Text>
-          <WaveDots color={theme.colors.text} />
-        </Animated.View>
-      ) : (
-        <Animated.View
-          key="input"
-          entering={FadeIn.duration(300).delay(200)}
-          exiting={FadeOut.duration(150)}
-          className="flex-1 flex-row items-end">
-          <TextInput
-            value={note}
-            onChangeText={onChangeNote}
-            placeholder={
-              dictation.listening
-                ? 'Listening…'
-                : (dictation.hint ??
-                  (mode === 'result' ? 'Something off? Tell me what to fix' : 'Add a note'))
-            }
-            placeholderTextColor={theme.colors.muted}
-            multiline
-            maxLength={280}
-            className="max-h-24 flex-1 py-2.5 font-sans text-[16px] text-text"
-            accessibilityLabel={mode === 'result' ? 'Correction for the analysis' : 'Meal note'}
-          />
-          {dictation.available ? (
-            <View className="mr-1.5">
-              <MicButton
-                listening={dictation.listening}
-                level={dictation.level}
-                onPress={dictation.toggle}
-                color={theme.colors.text}
-                fill={theme.colors.bg}
-                size={44}
-                offset={0}
-              />
-            </View>
-          ) : null}
-          <PressScale
-            accessibilityRole="button"
-            accessibilityLabel={mode === 'result' ? 'Re-analyse' : 'Analyse meal'}
-            accessibilityState={{ disabled: !canSend }}
-            disabled={!canSend}
-            onPress={send}
-            className={`h-11 w-11 items-center justify-center rounded-full bg-text ${canSend ? '' : 'opacity-30'}`}>
-            <ArrowUpIcon size={22} color={theme.colors.bg} />
-          </PressScale>
-        </Animated.View>
-      )}
-    </Animated.View>
-  );
-}
-
-/** Three dots rising and falling in a wave (still under reduced motion). */
-function WaveDots({ color }: { color: string }) {
-  return (
-    <View className="ml-2 flex-row items-end gap-1" style={{ height: 14 }}>
-      {[0, 1, 2].map((i) => (
-        <WaveDot key={i} index={i} color={color} />
-      ))}
-    </View>
-  );
-}
-
-function WaveDot({ index, color }: { index: number; color: string }) {
-  const reduced = useReducedMotion();
-  const y = useSharedValue(0);
-  useEffect(() => {
-    if (reduced) return;
-    y.set(
-      withDelay(
-        index * 140,
-        withRepeat(
-          withSequence(
-            withTiming(-5, { duration: 320, easing: Easing.inOut(Easing.sin) }),
-            withTiming(0, { duration: 320, easing: Easing.inOut(Easing.sin) }),
-            withTiming(0, { duration: 260 }),
-          ),
-          -1,
-        ),
-      ),
-    );
-  }, [reduced, index, y]);
-  const style = useAnimatedStyle(() => ({ transform: [{ translateY: y.get() }] }));
-  return (
-    <Animated.View
-      style={[{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: color }, style]}
-    />
-  );
-}
-
-function Action({
-  label,
-  Icon,
-  onPress,
-  onLongPress,
-}: {
-  label: string;
-  Icon: ComponentType<{ size?: number; color: string }>;
-  onPress: () => void;
-  onLongPress?: () => void;
-}) {
-  const { theme } = useHaloTheme();
-  return (
-    <PressScale
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint={onLongPress ? 'Long-press for other amounts' : undefined}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      delayLongPress={400}
-      className="items-center">
-      <View className="h-14 w-14 items-center justify-center rounded-full border border-hairline/10 bg-glass/10">
-        <Icon size={24} color={theme.colors.text} />
-      </View>
-      <Text className="mt-1.5 font-sans text-[12px] text-text/85">{label}</Text>
-    </PressScale>
   );
 }
 
