@@ -8,7 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressScale } from '@/components/press-scale';
 import { showToast } from '@/components/toast';
 import { prepareHero } from '@/share/photo';
-import { BusyOverlay, compose } from '@/share/sources/parts';
+import { BusyOverlay } from '@/share/sources/busy-overlay';
+import { openComposer } from '@/share/sources/open-composer';
 import { useHaloTheme } from '@/theme/theme-provider';
 import { type Tier, themeIds, themes, tierGradients } from '@/theme/themes';
 
@@ -28,7 +29,7 @@ export function HaloGrid() {
     if (busy) return;
     setBusy(id);
     try {
-      compose(await prepareHero(url));
+      openComposer(await prepareHero(url));
     } catch {
       showToast('That one needs a connection the first time');
     } finally {

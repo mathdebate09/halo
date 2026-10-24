@@ -6,7 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { showToast } from '@/components/toast';
 import { preparePhoto } from '@/share/photo';
-import { AllowAccess, BusyOverlay, compose } from '@/share/sources/parts';
+import { AllowAccess } from '@/share/sources/allow-access';
+import { BusyOverlay } from '@/share/sources/busy-overlay';
+import { openComposer } from '@/share/sources/open-composer';
 import { type Photo, usePhotoLibrary } from '@/share/sources/use-photo-library';
 
 /** The device's photos: collection chips over a three-column grid. */
@@ -21,7 +23,7 @@ export function PhotosGrid() {
     if (busy) return;
     setBusy(photo.id);
     try {
-      compose(await preparePhoto(photo.uri, photo.width, photo.height));
+      openComposer(await preparePhoto(photo.uri, photo.width, photo.height));
     } catch {
       showToast("Couldn't open that photo");
     } finally {

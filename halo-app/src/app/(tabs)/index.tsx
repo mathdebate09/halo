@@ -1,12 +1,9 @@
 import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Extrapolation,
-  FadeIn,
-  FadeOut,
   interpolate,
-  LayoutAnimationConfig,
   useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -21,38 +18,30 @@ import { recordShown } from '@/assistant/loop-store';
 import { useBriefWords } from '@/assistant/phrasing';
 import { useDockInset } from '@/components/dock';
 import { HeroBackdrop } from '@/components/hero-backdrop';
-import { MoonIcon, ShareIcon, SunIcon } from '@/components/icons';
-import { PressScale } from '@/components/press-scale';
 import { Reveal } from '@/components/reveal';
-import { ScoreArc, ScoreScrim } from '@/components/score-arc';
 import { ThemedScreen } from '@/components/themed-screen';
+import { useScrollReset } from '@/hooks/use-scroll-reset';
 import { refreshHealthData } from '@/lib/health-connect';
-import { setShareSnapshot } from '@/share/snapshot';
 import { PendingMealCard } from '@/meals/pending-meal-card';
 import { hourOfDay } from '@/shared';
-import { motion } from '@/theme/motion';
 import { useStatusBarStyle } from '@/theme/status-bar';
 import { ImageScope, useHaloTheme } from '@/theme/theme-provider';
 import { themes } from '@/theme/themes';
 import { TodayChips } from '@/today/chip-tips';
 import { briefCopy, todayCopy } from '@/today/copy';
+import { HeroBrief } from '@/today/hero-brief';
+import { HeroScore } from '@/today/hero-score';
 import { prefetchHeroes } from '@/today/prefetch';
 import { useMealCelebration } from '@/today/celebration';
-import { OverlayAskButton } from '@/overlay/ask-button';
-import { VoiceAskButton } from '@/voice/ask-button';
 import { LearnMore } from '@/today/learn-more';
 import { useTodayScores } from '@/today/today-scores';
+import { TodayTopBar } from '@/today/top-bar';
 
 // Today's hero, laid out like Oura's home on screen-height fractions so the arc sits over the
 // image's focus point and the text lands in the zones scripts/build-themes.mjs verified for
 // contrast (tagline 0.50-0.57, body 0.57-0.70). Learn more scrolls on to the day's summary.
+// The hero's parts: top-bar, hero-score and hero-brief in src/today/.
 const CHIPS_AT = 0.135;
-const SCORE_AT = 0.43;
-const SCORE_SIZE = 112;
-// Instrument Serif's ascenders overflow a line height equal to the font size.
-const SCORE_LINE = 132;
-const LABEL_AT = 0.478;
-const TEXT_AT = 0.522;
 /** The wordmark bar that stays on top once the hero has scrolled away. */
 const HEADER_HEIGHT = 48;
 
@@ -60,7 +49,7 @@ export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const [size, setSize] = useState({ width: window.width, height: window.height });
-  const { theme, target, mode, setMode } = useHaloTheme();
+  const { theme, target } = useHaloTheme();
   // The hero sits on the photo: its colors are the theme's dark ones in either mode.
   const hero = themes[theme.id];
   const scores = useTodayScores();
@@ -108,6 +97,11 @@ export default function TodayScreen() {
     },
   );
   useStatusBarStyle(heroAway ? null : 'light');
+  useScrollReset(scroll, () => {
+    scrollY.set(0);
+    setArmed(false);
+    setHeroAway(false);
+  });
   const scrimStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrollY.get(), [height * 0.55, height * 0.8], [0, 1], Extrapolation.CLAMP),
   }));
@@ -140,56 +134,7 @@ export default function TodayScreen() {
         {/* Clipped, so the parallaxed image never spills under the summary. */}
         <ImageScope style={{ height, overflow: 'hidden' }}>
           <HeroBackdrop scrollY={scrollY} />
-          <Reveal
-            index={0}
-            className="absolute inset-x-0 flex-row items-center justify-between px-5"
-            style={{ top: insets.top + 8 }}>
-            {/* As wide as the buttons on the right, so the wordmark stays centred. While the overlay
-                isn't allowed, its ask sits here, then the voice ask. */}
-            <View className="h-11 w-[96px] flex-row items-center">
-              <OverlayAskButton color={hero.colors.text} />
-              <VoiceAskButton color={hero.colors.text} />
-            </View>
-            {/* Long-press the wordmark for the hidden developer screen (dev builds only). */}
-            <Pressable
-              onLongPress={__DEV__ ? () => router.push('/dev') : undefined}
-              delayLongPress={600}
-              hitSlop={12}>
-              <Text className="font-wordmark text-[28px] text-text">Halo</Text>
-            </Pressable>
-            <View className="w-[96px] flex-row justify-end gap-2">
-              <PressScale
-                accessibilityRole="button"
-                accessibilityLabel={mode === 'light' ? 'Dark mode' : 'Light mode'}
-                onPress={() => setMode(mode === 'light' ? 'dark' : 'light')}
-                hitSlop={4}
-                className="h-11 w-11 items-center justify-center">
-                {/* The mode it switches to; the icons trade places with a short fade. */}
-                <Animated.View
-                  key={mode}
-                  entering={FadeIn.duration(200).easing(motion.calm)}
-                  exiting={FadeOut.duration(150)}
-                  className="absolute">
-                  {mode === 'light' ? (
-                    <MoonIcon size={22} color={hero.colors.text} />
-                  ) : (
-                    <SunIcon size={24} color={hero.colors.text} />
-                  )}
-                </Animated.View>
-              </PressScale>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Share"
-                onPress={() => {
-                  setShareSnapshot(scores, tierCopy.tagline, hero);
-                  router.push('/share');
-                }}
-                hitSlop={8}
-                className="h-11 w-11 items-center justify-center rounded-full active:bg-glass/10">
-                <ShareIcon size={24} color={hero.colors.text} />
-              </Pressable>
-            </View>
-          </Reveal>
+          <TodayTopBar top={insets.top + 8} tagline={tierCopy.tagline} />
 
           <Reveal
             index={1}
@@ -204,72 +149,25 @@ export default function TodayScreen() {
             />
           </Reveal>
 
-          <Reveal index={2} className="absolute inset-0" pointerEvents="none">
-            <ScoreScrim centerY={SCORE_AT * height} width={width} />
-            <ScoreArc
-              score={scores.overall}
-              provisional={scores.provisional}
-              glow={glow}
-              width={width}
-              height={height}
-            />
-            <View
-              className="absolute inset-x-0 items-center"
-              style={{ top: SCORE_AT * height - SCORE_LINE / 2, height: SCORE_LINE }}
-              accessible
-              accessibilityLabel={`${scores.provisional ? 'Early read' : 'Overall score'} ${scores.overall}`}>
-              <LayoutAnimationConfig skipEntering>
-                <Animated.Text
-                  key={scores.overall}
-                  entering={FadeIn.duration(500)}
-                  exiting={FadeOut.duration(300)}
-                  className="absolute font-serif text-text"
-                  style={{ fontSize: SCORE_SIZE, lineHeight: SCORE_LINE }}>
-                  {scores.overall}
-                </Animated.Text>
-              </LayoutAnimationConfig>
-            </View>
-            <Text
-              className="absolute inset-x-0 text-center font-sans-medium text-[13px] tracking-[2px] text-text/90"
-              style={{ top: LABEL_AT * height }}>
-              {scores.provisional ? 'EARLY READ' : 'OVERALL'}
-            </Text>
-          </Reveal>
-
-          <View className="absolute inset-x-0 items-center px-6" style={{ top: TEXT_AT * height }}>
-            {/* Full width: Android under-measures the serif in a shrink-wrapped box and wraps
-                short taglines ("Water / break"). */}
-            <Reveal index={3} className="w-full items-center">
-              {/* New words (tier, time of day, first real score) fade in rather than swap. */}
-              <LayoutAnimationConfig skipEntering>
-                <Animated.View
-                  key={`${copy.tagline}|${copy.body}`}
-                  entering={FadeIn.duration(500).easing(motion.calm)}
-                  className="w-full items-center">
-                  <Text className="w-full text-center font-serif text-[48px] leading-[54px] text-text">
-                    {copy.tagline}
-                  </Text>
-                  <Text className="mt-3 text-center font-sans text-[17px] leading-[26px] text-text/85">
-                    {copy.body}
-                  </Text>
-                </Animated.View>
-              </LayoutAnimationConfig>
-            </Reveal>
-            <Reveal index={4} className="items-center">
-              <PressScale
-                accessibilityRole="button"
-                onPress={() => {
-                  setArmed(true);
-                  scroll.current?.scrollTo({
-                    y: learnY.current - insets.top - HEADER_HEIGHT,
-                    animated: true,
-                  });
-                }}
-                className="mt-7 rounded-pill bg-glass/10 px-8 py-3.5">
-                <Text className="font-sans-medium text-[16px] text-text">Learn more</Text>
-              </PressScale>
-            </Reveal>
-          </View>
+          <HeroScore
+            score={scores.overall}
+            provisional={scores.provisional}
+            glow={glow}
+            width={width}
+            height={height}
+          />
+          <HeroBrief
+            height={height}
+            tagline={copy.tagline}
+            body={copy.body}
+            onLearnMore={() => {
+              setArmed(true);
+              scroll.current?.scrollTo({
+                y: learnY.current - insets.top - HEADER_HEIGHT,
+                animated: true,
+              });
+            }}
+          />
         </ImageScope>
 
         <View

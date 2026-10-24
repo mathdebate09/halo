@@ -9,7 +9,8 @@ import { CameraIcon } from '@/components/icons';
 import { PressScale } from '@/components/press-scale';
 import { showToast } from '@/components/toast';
 import { preparePhoto } from '@/share/photo';
-import { AllowAccess, compose } from '@/share/sources/parts';
+import { AllowAccess } from '@/share/sources/allow-access';
+import { openComposer } from '@/share/sources/open-composer';
 import { useHaloTheme } from '@/theme/theme-provider';
 
 /** A new shot as the background, framed 9:16 like the story it becomes. */
@@ -41,7 +42,7 @@ export function CameraSource() {
     setBusy(true);
     try {
       const shot = await camera.current.takePictureAsync({ quality: 0.9 });
-      compose(await preparePhoto(shot.uri, shot.width, shot.height));
+      openComposer(await preparePhoto(shot.uri, shot.width, shot.height));
     } catch {
       showToast("Couldn't take the photo");
     } finally {
